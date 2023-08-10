@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+  
+  <head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="generator" content="Typelevel Laika + Helium Theme" />
+  <title>Automatic <code>case class</code> marshalling</title>
+  
+  <meta name="author" content="Iván Molina Rebolledo"/>
+  
+  <meta name="author" content="Iván Molina Rebolledo"/>
+  
+  
+  <meta name="description" content="docs"/>
+  
+  
+  
+  
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Lato:400,700">
+  
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Fira+Mono:500">
+  
+  <link rel="stylesheet" type="text/css" href="helium/icofont.min.css" />
+    <link rel="stylesheet" type="text/css" href="helium/laika-helium.css" />
+  <script src="helium/laika-helium.js"></script>
+  
+  
+  <script> /* for avoiding page load transitions */ </script>
+</head>
+
+  <body>
+
+    <header id="top-bar" class="light-default dark-default">
+
+  <div class="row">
+    <a id="nav-icon">
+      <i class="icofont-laika navigationMenu" title="Navigation">&#xefa2;</i>
+    </a>
+    
+    
+  </div>
+
+  <a class="icon-link glyph-link" href="main.html"><i class="icofont-laika home" title="Home">&#xef47;</i></a>
+
+  <div class="row links">
+    
+    <a class="icon-link svg-link" href="https://github.com/deal-engine/finagle-postgres"><span class="github" title="Source Code"><svg class="svg-icon" width="100%" height="100%" viewBox="0 0 100 100" version="1.1" xmlns="http://www.w3.org/2000/svg" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
+  <g class="svg-shape">
+    <path d="M49.995,1c-27.609,-0 -49.995,22.386 -49.995,50.002c-0,22.09 14.325,40.83 34.194,47.444c2.501,0.458 3.413,-1.086 3.413,-2.412c0,-1.185 -0.043,-4.331 -0.067,-8.503c-13.908,3.021 -16.843,-6.704 -16.843,-6.704c-2.274,-5.773 -5.552,-7.311 -5.552,-7.311c-4.54,-3.103 0.344,-3.042 0.344,-3.042c5.018,0.356 7.658,5.154 7.658,5.154c4.46,7.64 11.704,5.433 14.552,4.156c0.454,-3.232 1.744,-5.436 3.174,-6.685c-11.102,-1.262 -22.775,-5.553 -22.775,-24.713c-0,-5.457 1.949,-9.92 5.147,-13.416c-0.516,-1.265 -2.231,-6.348 0.488,-13.233c0,0 4.199,-1.344 13.751,5.126c3.988,-1.108 8.266,-1.663 12.518,-1.682c4.245,0.019 8.523,0.574 12.517,1.682c9.546,-6.47 13.736,-5.126 13.736,-5.126c2.728,6.885 1.013,11.968 0.497,13.233c3.204,3.496 5.141,7.959 5.141,13.416c0,19.209 -11.691,23.436 -22.83,24.673c1.795,1.544 3.394,4.595 3.394,9.26c0,6.682 -0.061,12.076 -0.061,13.715c0,1.338 0.899,2.894 3.438,2.406c19.853,-6.627 34.166,-25.354 34.166,-47.438c-0,-27.616 -22.389,-50.002 -50.005,-50.002"/>
+  </g>
+</svg></span></a>
+    
+  </div>  
+
+</header>
+    
+    <nav id="sidebar">
+
+  <div class="row">
+    
+    <a class="icon-link svg-link" href="https://github.com/deal-engine/finagle-postgres"><span class="github" title="Source Code"><svg class="svg-icon" width="100%" height="100%" viewBox="0 0 100 100" version="1.1" xmlns="http://www.w3.org/2000/svg" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
+  <g class="svg-shape">
+    <path d="M49.995,1c-27.609,-0 -49.995,22.386 -49.995,50.002c-0,22.09 14.325,40.83 34.194,47.444c2.501,0.458 3.413,-1.086 3.413,-2.412c0,-1.185 -0.043,-4.331 -0.067,-8.503c-13.908,3.021 -16.843,-6.704 -16.843,-6.704c-2.274,-5.773 -5.552,-7.311 -5.552,-7.311c-4.54,-3.103 0.344,-3.042 0.344,-3.042c5.018,0.356 7.658,5.154 7.658,5.154c4.46,7.64 11.704,5.433 14.552,4.156c0.454,-3.232 1.744,-5.436 3.174,-6.685c-11.102,-1.262 -22.775,-5.553 -22.775,-24.713c-0,-5.457 1.949,-9.92 5.147,-13.416c-0.516,-1.265 -2.231,-6.348 0.488,-13.233c0,0 4.199,-1.344 13.751,5.126c3.988,-1.108 8.266,-1.663 12.518,-1.682c4.245,0.019 8.523,0.574 12.517,1.682c9.546,-6.47 13.736,-5.126 13.736,-5.126c2.728,6.885 1.013,11.968 0.497,13.233c3.204,3.496 5.141,7.959 5.141,13.416c0,19.209 -11.691,23.436 -22.83,24.673c1.795,1.544 3.394,4.595 3.394,9.26c0,6.682 -0.061,12.076 -0.061,13.715c0,1.338 0.899,2.894 3.438,2.406c19.853,-6.627 34.166,-25.354 34.166,-47.438c-0,-27.616 -22.389,-50.002 -50.005,-50.002"/>
+  </g>
+</svg></span></a>
+    
+  </div>
+
+  <ul class="nav-list">
+    <li class="level1 nav-leaf"><a href="main.html">finagle-postgres</a></li>
+    <li class="level1 nav-leaf"><a href="index.html">Finagle-postgres guide</a></li>
+    <li class="level1 nav-leaf"><a href="01-installation.html">Installation</a></li>
+    <li class="level1 nav-leaf"><a href="02-basic-usage.html">Basic Usage</a></li>
+    <li class="level1 nav-leaf"><a href="04-parameterized-queries.html">04-parameterized-queries.md</a></li>
+    <li class="level1 active nav-leaf"><a href="#">Automatic <code>case class</code> marshalling</a></li>
+    <li class="level1 nav-leaf"><a href="06-query-dsl.html">Query DSL</a></li>
+    <li class="level1 nav-leaf"><a href="03-simple-queries.html">Simple queries</a></li>
+  </ul>
+
+</nav>
+
+    <div id="container">
+
+      
+<nav id="page-nav">
+  <p class="header"><a href="#">Automatic <code>case class</code> marshalling</a></p>
+
+  <ul class="nav-list">
+  </ul>
+
+  <p class="footer"></p>
+</nav>
+
+
+      <main class="content">
+
+        <h1 id="automatic-case-class-marshalling" class="title">Automatic <code>case class</code> marshalling</h1>
+        <p>As we&#39;ve seen earlier, <code>SELECT</code> queries using the finagle-postgres API must specify a function which operates on a <code>Row</code>
+        and returns some type <code>T</code>. The resulting future is then the result of all the rows after being mapped with the given
+        function: <code>Future[Seq[T]]</code>.</p>
+        <p>This typically results in a pattern like this:</p>
+        <pre><code class="nohighlight"><span class="keyword">import</span><span> </span><span class="identifier">com</span><span>.</span><span class="identifier">twitter</span><span>.</span><span class="identifier">finagle</span><span>.</span><span class="type-name">Postgres</span><span>
+</span><span class="keyword">import</span><span> </span><span class="identifier">com</span><span>.</span><span class="identifier">twitter</span><span>.</span><span class="identifier">util</span><span>.</span><span class="type-name">Await</span><span>
+</span><span class="comment">// create the client based on environment variables
+</span><span class="keyword">val</span><span> </span><span class="identifier">client</span><span> = {
+  </span><span class="type-name">Postgres</span><span>.</span><span class="type-name">Client</span><span>()
+    .</span><span class="identifier">withCredentials</span><span>(</span><span class="identifier">sys</span><span>.</span><span class="identifier">env</span><span>(</span><span class="string-literal">&quot;PG_USER&quot;</span><span>), </span><span class="identifier">sys</span><span>.</span><span class="identifier">env</span><span>.</span><span class="identifier">get</span><span>(</span><span class="string-literal">&quot;PG_PASSWORD&quot;</span><span>))
+    .</span><span class="identifier">database</span><span>(</span><span class="identifier">sys</span><span>.</span><span class="identifier">env</span><span>(</span><span class="string-literal">&quot;PG_DBNAME&quot;</span><span>))
+    .</span><span class="identifier">withSessionPool</span><span>.</span><span class="identifier">maxSize</span><span>(</span><span class="number-literal">1</span><span>)
+    .</span><span class="identifier">withBinaryResults</span><span>(</span><span class="boolean-literal">true</span><span>)
+    .</span><span class="identifier">withBinaryParams</span><span>(</span><span class="boolean-literal">true</span><span>)
+    .</span><span class="identifier">newRichClient</span><span>(</span><span class="identifier">sys</span><span>.</span><span class="identifier">env</span><span>(</span><span class="string-literal">&quot;PG_HOST_PORT&quot;</span><span>))
+}
+
+</span><span class="type-name">Await</span><span>.</span><span class="identifier">result</span><span>(</span><span class="identifier">client</span><span>.</span><span class="identifier">execute</span><span>(</span><span class="string-literal">&quot;DROP TABLE IF EXISTS demo&quot;</span><span>))
+</span><span class="type-name">Await</span><span>.</span><span class="identifier">result</span><span>(</span><span class="identifier">client</span><span>.</span><span class="identifier">prepareAndExecute</span><span>(</span><span class="string-literal">&quot;CREATE TABLE demo(id serial PRIMARY KEY, foo text)&quot;</span><span>))
+</span><span class="type-name">Await</span><span>.</span><span class="identifier">result</span><span>(</span><span class="identifier">client</span><span>.</span><span class="identifier">prepareAndExecute</span><span>(</span><span class="string-literal">&quot;INSERT INTO demo (foo) VALUES ($1)&quot;</span><span>, </span><span class="string-literal">&quot;foo&quot;</span><span>: </span><span class="type-name">String</span><span>))
+
+</span><span class="keyword">case</span><span> </span><span class="keyword">class</span><span> </span><span class="type-name">Demo</span><span>(</span><span class="identifier">id</span><span>: </span><span class="type-name">Int</span><span>, </span><span class="identifier">foo</span><span>: </span><span class="type-name">String</span><span>)
+
+</span><span class="keyword">val</span><span> </span><span class="identifier">select</span><span> = </span><span class="identifier">client</span><span>.</span><span class="identifier">prepareAndQuery</span><span>(</span><span class="string-literal">&quot;SELECT * FROM demo&quot;</span><span>) {
+  </span><span class="identifier">row</span><span> =&gt; </span><span class="type-name">Demo</span><span>(
+    </span><span class="identifier">id</span><span> = </span><span class="identifier">row</span><span>.</span><span class="identifier">get</span><span>[</span><span class="type-name">Int</span><span>](</span><span class="string-literal">&quot;id&quot;</span><span>),
+    </span><span class="identifier">foo</span><span> = </span><span class="identifier">row</span><span>.</span><span class="identifier">get</span><span>[</span><span class="type-name">String</span><span>](</span><span class="string-literal">&quot;foo&quot;</span><span>)
+  )
+}
+
+</span><span class="type-name">Await</span><span>.</span><span class="identifier">result</span><span>(</span><span class="identifier">select</span><span>)</span></code></pre>
+        <p>As you can see, this probably gets verbose and repetitive for rows which have a larger number of columns. It looks like
+        there must be a better way, and thanks to <a href="https://github.com/milessabin/shapeless">shapeless</a>, there is! Importing
+        <code>com.twitter.finagle.postgres.generic._</code> enriches <code>client</code> with an additional operation, <code>queryAs</code>:</p>
+        <pre class="keep-together pdf epub"><code class="nohighlight"><span class="keyword">import</span><span> </span><span class="identifier">com</span><span>.</span><span class="identifier">twitter</span><span>.</span><span class="identifier">finagle</span><span>.</span><span class="identifier">postgres</span><span>.</span><span class="identifier">generic</span><span>.</span><span class="identifier">_</span><span>
+
+</span><span class="keyword">val</span><span> </span><span class="identifier">result</span><span> = </span><span class="type-name">Await</span><span>.</span><span class="identifier">result</span><span> {
+  </span><span class="identifier">client</span><span>.</span><span class="identifier">queryAs</span><span>[</span><span class="type-name">Demo</span><span>](</span><span class="string-literal">&quot;SELECT * FROM demo&quot;</span><span>)
+}</span></code></pre>
+        <p>This method automatically decodes the rows into the specified case class. By default, names are converted to snake case
+        for accessing the fields in the table; this can be overridden by importing <code>com.twitter.finagle.postgres.generic.ColumnNamer.identity._</code>
+        to instead do nothing to convert column names.</p>
+        <p>Next, read about <a href="06-query-dsl.html">Query DSL</a></p>
+
+        
+<hr class="footer-rule"/>
+<footer>
+  Site generated by <a href="https://typelevel.org/Laika/">Laika</a> with the Helium theme.
+</footer>
+
+
+      </main>
+
+    </div>
+
+  </body>
+
+</html>

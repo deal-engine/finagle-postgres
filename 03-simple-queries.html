@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+  
+  <head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="generator" content="Typelevel Laika + Helium Theme" />
+  <title>Simple queries</title>
+  
+  <meta name="author" content="Iván Molina Rebolledo"/>
+  
+  <meta name="author" content="Iván Molina Rebolledo"/>
+  
+  
+  <meta name="description" content="docs"/>
+  
+  
+  
+  
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Lato:400,700">
+  
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Fira+Mono:500">
+  
+  <link rel="stylesheet" type="text/css" href="helium/icofont.min.css" />
+    <link rel="stylesheet" type="text/css" href="helium/laika-helium.css" />
+  <script src="helium/laika-helium.js"></script>
+  
+  
+  <script> /* for avoiding page load transitions */ </script>
+</head>
+
+  <body>
+
+    <header id="top-bar" class="light-default dark-default">
+
+  <div class="row">
+    <a id="nav-icon">
+      <i class="icofont-laika navigationMenu" title="Navigation">&#xefa2;</i>
+    </a>
+    
+    
+  </div>
+
+  <a class="icon-link glyph-link" href="main.html"><i class="icofont-laika home" title="Home">&#xef47;</i></a>
+
+  <div class="row links">
+    
+    <a class="icon-link svg-link" href="https://github.com/deal-engine/finagle-postgres"><span class="github" title="Source Code"><svg class="svg-icon" width="100%" height="100%" viewBox="0 0 100 100" version="1.1" xmlns="http://www.w3.org/2000/svg" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
+  <g class="svg-shape">
+    <path d="M49.995,1c-27.609,-0 -49.995,22.386 -49.995,50.002c-0,22.09 14.325,40.83 34.194,47.444c2.501,0.458 3.413,-1.086 3.413,-2.412c0,-1.185 -0.043,-4.331 -0.067,-8.503c-13.908,3.021 -16.843,-6.704 -16.843,-6.704c-2.274,-5.773 -5.552,-7.311 -5.552,-7.311c-4.54,-3.103 0.344,-3.042 0.344,-3.042c5.018,0.356 7.658,5.154 7.658,5.154c4.46,7.64 11.704,5.433 14.552,4.156c0.454,-3.232 1.744,-5.436 3.174,-6.685c-11.102,-1.262 -22.775,-5.553 -22.775,-24.713c-0,-5.457 1.949,-9.92 5.147,-13.416c-0.516,-1.265 -2.231,-6.348 0.488,-13.233c0,0 4.199,-1.344 13.751,5.126c3.988,-1.108 8.266,-1.663 12.518,-1.682c4.245,0.019 8.523,0.574 12.517,1.682c9.546,-6.47 13.736,-5.126 13.736,-5.126c2.728,6.885 1.013,11.968 0.497,13.233c3.204,3.496 5.141,7.959 5.141,13.416c0,19.209 -11.691,23.436 -22.83,24.673c1.795,1.544 3.394,4.595 3.394,9.26c0,6.682 -0.061,12.076 -0.061,13.715c0,1.338 0.899,2.894 3.438,2.406c19.853,-6.627 34.166,-25.354 34.166,-47.438c-0,-27.616 -22.389,-50.002 -50.005,-50.002"/>
+  </g>
+</svg></span></a>
+    
+  </div>  
+
+</header>
+    
+    <nav id="sidebar">
+
+  <div class="row">
+    
+    <a class="icon-link svg-link" href="https://github.com/deal-engine/finagle-postgres"><span class="github" title="Source Code"><svg class="svg-icon" width="100%" height="100%" viewBox="0 0 100 100" version="1.1" xmlns="http://www.w3.org/2000/svg" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
+  <g class="svg-shape">
+    <path d="M49.995,1c-27.609,-0 -49.995,22.386 -49.995,50.002c-0,22.09 14.325,40.83 34.194,47.444c2.501,0.458 3.413,-1.086 3.413,-2.412c0,-1.185 -0.043,-4.331 -0.067,-8.503c-13.908,3.021 -16.843,-6.704 -16.843,-6.704c-2.274,-5.773 -5.552,-7.311 -5.552,-7.311c-4.54,-3.103 0.344,-3.042 0.344,-3.042c5.018,0.356 7.658,5.154 7.658,5.154c4.46,7.64 11.704,5.433 14.552,4.156c0.454,-3.232 1.744,-5.436 3.174,-6.685c-11.102,-1.262 -22.775,-5.553 -22.775,-24.713c-0,-5.457 1.949,-9.92 5.147,-13.416c-0.516,-1.265 -2.231,-6.348 0.488,-13.233c0,0 4.199,-1.344 13.751,5.126c3.988,-1.108 8.266,-1.663 12.518,-1.682c4.245,0.019 8.523,0.574 12.517,1.682c9.546,-6.47 13.736,-5.126 13.736,-5.126c2.728,6.885 1.013,11.968 0.497,13.233c3.204,3.496 5.141,7.959 5.141,13.416c0,19.209 -11.691,23.436 -22.83,24.673c1.795,1.544 3.394,4.595 3.394,9.26c0,6.682 -0.061,12.076 -0.061,13.715c0,1.338 0.899,2.894 3.438,2.406c19.853,-6.627 34.166,-25.354 34.166,-47.438c-0,-27.616 -22.389,-50.002 -50.005,-50.002"/>
+  </g>
+</svg></span></a>
+    
+  </div>
+
+  <ul class="nav-list">
+    <li class="level1 nav-leaf"><a href="main.html">finagle-postgres</a></li>
+    <li class="level1 nav-leaf"><a href="index.html">Finagle-postgres guide</a></li>
+    <li class="level1 nav-leaf"><a href="01-installation.html">Installation</a></li>
+    <li class="level1 nav-leaf"><a href="02-basic-usage.html">Basic Usage</a></li>
+    <li class="level1 nav-leaf"><a href="04-parameterized-queries.html">04-parameterized-queries.md</a></li>
+    <li class="level1 nav-leaf"><a href="05-automatic-case-class-marshalling.html">Automatic <code>case class</code> marshalling</a></li>
+    <li class="level1 nav-leaf"><a href="06-query-dsl.html">Query DSL</a></li>
+    <li class="level1 active nav-leaf"><a href="#">Simple queries</a></li>
+  </ul>
+
+</nav>
+
+    <div id="container">
+
+      
+<nav id="page-nav">
+  <p class="header"><a href="#">Simple queries</a></p>
+
+  <ul class="nav-list">
+    <li class="level1 nav-leaf"><a href="#valuedecoder"><code>ValueDecoder</code></a></li>
+  </ul>
+
+  <p class="footer"></p>
+</nav>
+
+
+      <main class="content">
+
+        <h1 id="simple-queries" class="title">Simple queries</h1>
+        <p>Finagle-postgres can use PostgreSQL&#39;s simple query interface to perform queries. These queries are limited, because they
+        cannot be parameterized - any data that will be provided by the client must be included in the query string itself.
+        Therefore, the simple query interface should not be used when any user input is going to be used in the query, as that
+        could be a vector for SQL injection attacks.</p>
+        <p>Still, it can be useful to try them out.</p>
+        <pre><code class="nohighlight"><span class="keyword">import</span><span> </span><span class="identifier">com</span><span>.</span><span class="identifier">twitter</span><span>.</span><span class="identifier">finagle</span><span>.</span><span class="type-name">Postgres</span><span>
+</span><span class="keyword">import</span><span> </span><span class="identifier">com</span><span>.</span><span class="identifier">twitter</span><span>.</span><span class="identifier">util</span><span>.</span><span class="type-name">Await</span><span>
+</span><span class="comment">// create the client based on environment variables
+</span><span class="keyword">val</span><span> </span><span class="identifier">client</span><span> = {
+  </span><span class="type-name">Postgres</span><span>.</span><span class="type-name">Client</span><span>()
+    .</span><span class="identifier">withCredentials</span><span>(</span><span class="identifier">sys</span><span>.</span><span class="identifier">env</span><span>(</span><span class="string-literal">&quot;PG_USER&quot;</span><span>), </span><span class="identifier">sys</span><span>.</span><span class="identifier">env</span><span>.</span><span class="identifier">get</span><span>(</span><span class="string-literal">&quot;PG_PASSWORD&quot;</span><span>))
+    .</span><span class="identifier">database</span><span>(</span><span class="identifier">sys</span><span>.</span><span class="identifier">env</span><span>(</span><span class="string-literal">&quot;PG_DBNAME&quot;</span><span>))
+    .</span><span class="identifier">withSessionPool</span><span>.</span><span class="identifier">maxSize</span><span>(</span><span class="number-literal">1</span><span>)
+    .</span><span class="identifier">withBinaryResults</span><span>(</span><span class="boolean-literal">true</span><span>)
+    .</span><span class="identifier">withBinaryParams</span><span>(</span><span class="boolean-literal">true</span><span>)
+    .</span><span class="identifier">newRichClient</span><span>(</span><span class="identifier">sys</span><span>.</span><span class="identifier">env</span><span>(</span><span class="string-literal">&quot;PG_HOST_PORT&quot;</span><span>))
+}
+  
+</span><span class="comment">// execute a query that has no results - i.e. CREATE TABLE, UPDATE, INSERT, DELETE, etc.
+</span><span class="keyword">val</span><span> </span><span class="identifier">create</span><span> = </span><span class="type-name">Await</span><span>.</span><span class="identifier">result</span><span> {
+  </span><span class="identifier">client</span><span>.</span><span class="identifier">execute</span><span>(</span><span class="string-literal">&quot;CREATE TABLE demo(id serial PRIMARY KEY, foo text)&quot;</span><span>)
+}
+
+</span><span class="keyword">val</span><span> </span><span class="identifier">insert</span><span> = </span><span class="type-name">Await</span><span>.</span><span class="identifier">result</span><span> {
+  </span><span class="identifier">client</span><span>.</span><span class="identifier">execute</span><span>(</span><span class="string-literal">&quot;INSERT INTO demo(foo) VALUES (&#39;foo&#39;)&quot;</span><span>)
+}
+
+</span><span class="comment">// execute a query that has results - a function is given to treat the rows
+</span><span class="keyword">val</span><span> </span><span class="identifier">select</span><span> = </span><span class="identifier">client</span><span>.</span><span class="identifier">select</span><span>(</span><span class="string-literal">&quot;SELECT * FROM demo&quot;</span><span>) {
+  </span><span class="identifier">row</span><span> =&gt; </span><span class="identifier">row</span><span>.</span><span class="identifier">get</span><span>[</span><span class="type-name">String</span><span>](</span><span class="string-literal">&quot;foo&quot;</span><span>)
+}
+
+</span><span class="type-name">Await</span><span>.</span><span class="identifier">result</span><span>(</span><span class="identifier">select</span><span>)</span></code></pre>
+        <p>Since the results of any operation in finagle are typically a <code>Future</code>, we use <code>Await.result</code> to block and wait for
+        the result to materialize. This is handy for a demo, but in production code you wouldn&#39;t use await. Instead, you would
+        sequence operations using <code>flatMap</code>, and parallelize them using <code>Future.join</code> or <code>Future.sequence</code>. See the 
+        <a href="https://twitter.github.io/finagle/guide/index.html">Finagle User Guide</a> for more information about concurrent
+        programming with <code>Future</code>s.</p>
+        <p>As you can see, the <code>SELECT</code> query includes a function body in a second argument list. This function will receive each
+        <code>Row</code> that results from the query, and the results of the function will be accumulated into the resulting <code>Future[Seq]</code>.
+        <code>Row</code> is an interface that allows retrieving values from Postgres rows in a type-safe way using the following interface:</p>
+        <ul>
+          <li><code>get[T](name: String)</code> - Get the named column from the row as type <code>T</code>. Has unspecified behavior (possibly throwing an
+          exception) if the column is <code>NULL</code> or does not exist.</li>
+          <li><code>getOption[T](name: String)</code> - Get the named column as an <code>Option[T]</code>. The result will be <code>None</code> if the value is <code>NULL</code>,
+          or the column does not exist</li>
+          <li><code>getTry[T](name: String)</code> - Attempt to get the named column as a <code>Try[T]</code>. The result will be <code>Throw</code> if the value is
+          <code>NULL</code>, or if the column does not exist, or if the value cannot be decoded to <code>T</code>.</li>
+          <li><code>getAny(name: String)</code> - Get the named column, using the default Scala type for whatever the Postgres data type of the
+          column is.</li>
+        </ul>
+        <p>Each of these methods additionally has an overloaded version that takes <code>Int</code>, specifying the index of the column rather
+        than its name.</p>
+        
+        <h2 id="valuedecoder" class="section"><a class="anchor-link left" href="#valuedecoder"><i class="icofont-laika link">&#xef71;</i></a><code>ValueDecoder</code></h2>
+        <p>All of the typed methods require an implicit <code>ValueDecoder[T]</code>, which is a typeclass that tells finagle-postgres how to
+        decode the column. Currently, instances are supplied for the following Scala types:</p>
+        <ul>
+          <li><code>String</code> - for <code>text</code>, <code>char</code>, <code>varchar</code>, <code>citext</code>, and other stringy Postgres values (including <code>ENUM</code>)</li>
+          <li><code>Byte</code>, <code>Short</code>, <code>Int</code>, <code>Long</code> - for the Postgres integers of their corresponding widths</li>
+          <li><code>Float</code>, <code>Double</code> - for the Postgres floating-point values of their corresponding precision</li>
+          <li><code>BigDecimal</code>, <code>java.math.BigDecimal</code> - for Postgres <code>numeric</code> values of arbitrary precision</li>
+          <li><code>java.util.UUID</code> - for Postgres <code>uuid</code> values</li>
+          <li><code>java.time.LocalDate</code> - for Postgres <code>date</code> values</li>
+          <li><code>java.time.LocalDateTime</code> - for Postgres <code>timestamp without time zone</code> values</li>
+          <li><code>java.time.Instant</code>, <code>java.time.OffsetDateTime</code>, <code>java.time.ZonedDateTime</code> - for Postgres <code>timestamp with time zone</code> values</li>
+          <li><code>java.net.InetAddress</code> - for Postgres <code>inet</code> values</li>
+          <li><code>Map[String, Option[String]]</code> - for Postgres <code>hstore</code> values</li>
+        </ul>
+        <p>New <code>ValueDecoder</code> instances can be specified for other types; take a look at the existing instances for guidance. We
+        are happy to accept instances for built-in Scala or Java types into finagle-postgres!</p>
+        <p>Next, read about <a href="04-parameterized-queries.html">Parameterized Queries</a></p>
+
+        
+<hr class="footer-rule"/>
+<footer>
+  Site generated by <a href="https://typelevel.org/Laika/">Laika</a> with the Helium theme.
+</footer>
+
+
+      </main>
+
+    </div>
+
+  </body>
+
+</html>

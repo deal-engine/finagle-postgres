@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+  
+  <head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="generator" content="Typelevel Laika + Helium Theme" />
+  <title>Basic Usage</title>
+  
+  <meta name="author" content="Iván Molina Rebolledo"/>
+  
+  <meta name="author" content="Iván Molina Rebolledo"/>
+  
+  
+  <meta name="description" content="docs"/>
+  
+  
+  
+  
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Lato:400,700">
+  
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Fira+Mono:500">
+  
+  <link rel="stylesheet" type="text/css" href="helium/icofont.min.css" />
+    <link rel="stylesheet" type="text/css" href="helium/laika-helium.css" />
+  <script src="helium/laika-helium.js"></script>
+  
+  
+  <script> /* for avoiding page load transitions */ </script>
+</head>
+
+  <body>
+
+    <header id="top-bar" class="light-default dark-default">
+
+  <div class="row">
+    <a id="nav-icon">
+      <i class="icofont-laika navigationMenu" title="Navigation">&#xefa2;</i>
+    </a>
+    
+    
+  </div>
+
+  <a class="icon-link glyph-link" href="main.html"><i class="icofont-laika home" title="Home">&#xef47;</i></a>
+
+  <div class="row links">
+    
+    <a class="icon-link svg-link" href="https://github.com/deal-engine/finagle-postgres"><span class="github" title="Source Code"><svg class="svg-icon" width="100%" height="100%" viewBox="0 0 100 100" version="1.1" xmlns="http://www.w3.org/2000/svg" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
+  <g class="svg-shape">
+    <path d="M49.995,1c-27.609,-0 -49.995,22.386 -49.995,50.002c-0,22.09 14.325,40.83 34.194,47.444c2.501,0.458 3.413,-1.086 3.413,-2.412c0,-1.185 -0.043,-4.331 -0.067,-8.503c-13.908,3.021 -16.843,-6.704 -16.843,-6.704c-2.274,-5.773 -5.552,-7.311 -5.552,-7.311c-4.54,-3.103 0.344,-3.042 0.344,-3.042c5.018,0.356 7.658,5.154 7.658,5.154c4.46,7.64 11.704,5.433 14.552,4.156c0.454,-3.232 1.744,-5.436 3.174,-6.685c-11.102,-1.262 -22.775,-5.553 -22.775,-24.713c-0,-5.457 1.949,-9.92 5.147,-13.416c-0.516,-1.265 -2.231,-6.348 0.488,-13.233c0,0 4.199,-1.344 13.751,5.126c3.988,-1.108 8.266,-1.663 12.518,-1.682c4.245,0.019 8.523,0.574 12.517,1.682c9.546,-6.47 13.736,-5.126 13.736,-5.126c2.728,6.885 1.013,11.968 0.497,13.233c3.204,3.496 5.141,7.959 5.141,13.416c0,19.209 -11.691,23.436 -22.83,24.673c1.795,1.544 3.394,4.595 3.394,9.26c0,6.682 -0.061,12.076 -0.061,13.715c0,1.338 0.899,2.894 3.438,2.406c19.853,-6.627 34.166,-25.354 34.166,-47.438c-0,-27.616 -22.389,-50.002 -50.005,-50.002"/>
+  </g>
+</svg></span></a>
+    
+  </div>  
+
+</header>
+    
+    <nav id="sidebar">
+
+  <div class="row">
+    
+    <a class="icon-link svg-link" href="https://github.com/deal-engine/finagle-postgres"><span class="github" title="Source Code"><svg class="svg-icon" width="100%" height="100%" viewBox="0 0 100 100" version="1.1" xmlns="http://www.w3.org/2000/svg" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
+  <g class="svg-shape">
+    <path d="M49.995,1c-27.609,-0 -49.995,22.386 -49.995,50.002c-0,22.09 14.325,40.83 34.194,47.444c2.501,0.458 3.413,-1.086 3.413,-2.412c0,-1.185 -0.043,-4.331 -0.067,-8.503c-13.908,3.021 -16.843,-6.704 -16.843,-6.704c-2.274,-5.773 -5.552,-7.311 -5.552,-7.311c-4.54,-3.103 0.344,-3.042 0.344,-3.042c5.018,0.356 7.658,5.154 7.658,5.154c4.46,7.64 11.704,5.433 14.552,4.156c0.454,-3.232 1.744,-5.436 3.174,-6.685c-11.102,-1.262 -22.775,-5.553 -22.775,-24.713c-0,-5.457 1.949,-9.92 5.147,-13.416c-0.516,-1.265 -2.231,-6.348 0.488,-13.233c0,0 4.199,-1.344 13.751,5.126c3.988,-1.108 8.266,-1.663 12.518,-1.682c4.245,0.019 8.523,0.574 12.517,1.682c9.546,-6.47 13.736,-5.126 13.736,-5.126c2.728,6.885 1.013,11.968 0.497,13.233c3.204,3.496 5.141,7.959 5.141,13.416c0,19.209 -11.691,23.436 -22.83,24.673c1.795,1.544 3.394,4.595 3.394,9.26c0,6.682 -0.061,12.076 -0.061,13.715c0,1.338 0.899,2.894 3.438,2.406c19.853,-6.627 34.166,-25.354 34.166,-47.438c-0,-27.616 -22.389,-50.002 -50.005,-50.002"/>
+  </g>
+</svg></span></a>
+    
+  </div>
+
+  <ul class="nav-list">
+    <li class="level1 nav-leaf"><a href="main.html">finagle-postgres</a></li>
+    <li class="level1 nav-leaf"><a href="index.html">Finagle-postgres guide</a></li>
+    <li class="level1 nav-leaf"><a href="01-installation.html">Installation</a></li>
+    <li class="level1 active nav-leaf"><a href="#">Basic Usage</a></li>
+    <li class="level1 nav-leaf"><a href="04-parameterized-queries.html">04-parameterized-queries.md</a></li>
+    <li class="level1 nav-leaf"><a href="05-automatic-case-class-marshalling.html">Automatic <code>case class</code> marshalling</a></li>
+    <li class="level1 nav-leaf"><a href="06-query-dsl.html">Query DSL</a></li>
+    <li class="level1 nav-leaf"><a href="03-simple-queries.html">Simple queries</a></li>
+  </ul>
+
+</nav>
+
+    <div id="container">
+
+      
+<nav id="page-nav">
+  <p class="header"><a href="#">Basic Usage</a></p>
+
+  <ul class="nav-list">
+    <li class="level1 nav-node"><a href="#configuration">Configuration</a></li>
+    <li class="level2 nav-leaf"><a href="#specify-credentials-required">Specify credentials (required)</a></li>
+    <li class="level2 nav-leaf"><a href="#specify-database-name-required">Specify database name (required)</a></li>
+    <li class="level2 nav-leaf"><a href="#configure-transport">Configure transport</a></li>
+    <li class="level2 nav-leaf"><a href="#configure-connection-pool">Configure connection pool</a></li>
+  </ul>
+
+  <p class="footer"></p>
+</nav>
+
+
+      <main class="content">
+
+        <hr>
+        <p>title: Basic Usage
+        layout: default
+        ---</p>
+        <h1 id="basic-usage" class="title">Basic Usage</h1>
+        <p>Finagle-postgres follows the conventions of the rest of the finagle ecosystem. To connect to a PostgreSQL server, use
+        the client builder accessed by <code>com.twitter.finagle.Postgres.Client()</code>:</p>
+        <pre class="keep-together pdf epub"><code class="nohighlight"><span class="keyword">import</span><span> </span><span class="identifier">com</span><span>.</span><span class="identifier">twitter</span><span>.</span><span class="identifier">finagle</span><span>.</span><span class="type-name">Postgres</span><span>
+
+</span><span class="keyword">val</span><span> </span><span class="identifier">client</span><span> = </span><span class="type-name">Postgres</span><span>.</span><span class="type-name">Client</span><span>()
+  .</span><span class="identifier">withCredentials</span><span>(</span><span class="string-literal">&quot;user&quot;</span><span>, </span><span class="type-name">Some</span><span>(</span><span class="string-literal">&quot;password&quot;</span><span>))
+  .</span><span class="identifier">database</span><span>(</span><span class="string-literal">&quot;dbname&quot;</span><span>)
+  .</span><span class="identifier">withSessionPool</span><span>.</span><span class="identifier">maxSize</span><span>(</span><span class="number-literal">1</span><span>)
+  .</span><span class="identifier">withBinaryResults</span><span>(</span><span class="boolean-literal">true</span><span>)
+  .</span><span class="identifier">withBinaryParams</span><span>(</span><span class="boolean-literal">true</span><span>)
+  .</span><span class="identifier">withTransport</span><span>.</span><span class="identifier">tls</span><span>(</span><span class="string-literal">&quot;host&quot;</span><span>)
+  .</span><span class="identifier">newRichClient</span><span>(</span><span class="string-literal">&quot;localhost:5432&quot;</span><span>)
+</span><span class="comment">// client: com.twitter.finagle.postgres.PostgresClientImpl = com.twitter.finagle.postgres.PostgresClientImpl@4aad3db9</span></code></pre>
+        
+        <h2 id="configuration" class="section"><a class="anchor-link left" href="#configuration"><i class="icofont-laika link">&#xef71;</i></a>Configuration</h2>
+        <p><code>Postgres.Client()</code> is a builder for finagle-postgres&#39; stack-based client; it offers a fluent API for the most common
+        configuration needs:</p>
+        
+        <h5 id="specify-credentials-required" class="section"><a class="anchor-link left" href="#specify-credentials-required"><i class="icofont-laika link">&#xef71;</i></a>Specify credentials (required)</h5>
+        <p>Use <code>withCredentials</code> to provide a username and password for the connection.
+        * <code>withCredentials(user: String, password: Option[String])</code>
+        * <code>withCredentials(user: String, password: String)</code>
+        * <code>withCredentials(user: String)</code></p>
+        
+        <h5 id="specify-database-name-required" class="section"><a class="anchor-link left" href="#specify-database-name-required"><i class="icofont-laika link">&#xef71;</i></a>Specify database name (required)</h5>
+        <ul>
+          <li><code>database(name: String)</code> - provide the name of the database to which finagle-postgres should connect</li>
+        </ul>
+        
+        <h5 id="configure-transport" class="section"><a class="anchor-link left" href="#configure-transport"><i class="icofont-laika link">&#xef71;</i></a>Configure transport</h5>
+        <ul>
+          <li><code>withBinaryResults(enable: Boolean)</code> - enable or disable using binary format for results on the wire (default disabled)</li>
+          <li><code>withBinaryParams(enable: Boolean)</code> - enable or disable using binary format for parameters on the wire (default disabled)</li>
+          <li><code>withTransport.tls(hostname: String)</code> - enable SSL using the given hostname</li>
+        </ul>
+        
+        <h5 id="configure-connection-pool" class="section"><a class="anchor-link left" href="#configure-connection-pool"><i class="icofont-laika link">&#xef71;</i></a>Configure connection pool</h5>
+        <ul>
+          <li><code>.withSessionPool.maxSize(size: Int)</code> - configure the maximum number of connections in the pool</li>
+          <li><code>.withSessionPool.minSize(size: Int)</code> - configure the minimum number of connections in the pool</li>
+        </ul>
+        <p>Additionally, since <code>Postgres.Client()</code> is a standard Finagle stack client, it can be configured in myriad other ways.
+        Take a look at the <a href="https://twitter.github.io/finagle/guide/Clients.html">Finagle Clients guide</a> for more information.</p>
+        <p>Since you&#39;ll typically will want to interact with Postgres at the level of queries, rather than individual protocol-level
+        requests and responses, use <code>.newRichClient(destination: String)</code> to create a <code>com.twitter.finagle.postgres.Client</code>,
+        which provides the main API for using the PostgreSQL database.</p>
+        <p>Next, read about <a href="03-simple-queries.html">Simple Queries</a></p>
+
+        
+<hr class="footer-rule"/>
+<footer>
+  Site generated by <a href="https://typelevel.org/Laika/">Laika</a> with the Helium theme.
+</footer>
+
+
+      </main>
+
+    </div>
+
+  </body>
+
+</html>
