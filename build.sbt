@@ -1,5 +1,5 @@
 // https://typelevel.org/sbt-typelevel/faq.html#what-is-a-base-version-anyway
-ThisBuild / tlBaseVersion := "0.16" // your current series x.y
+ThisBuild / tlBaseVersion := "0.17" // your current series x.y
 
 ThisBuild / organization := "io.github.deal-engine"
 ThisBuild / organizationName := "Deal Engine"
@@ -8,7 +8,8 @@ ThisBuild / licenses := Seq(License.Apache2)
 ThisBuild / developers := List(
   // your GitHub handle and name
   tlGitHubDev("ivanmoreau", "Iván Molina Rebolledo"),
-  tlGitHubDev("IvanAtDealEngine", "Iván Molina Rebolledo")
+  tlGitHubDev("IvanAtDealEngine", "Iván Molina Rebolledo"),
+  tlGitHubDev("fabianhjr-dealengine", "Fabián Heredia Montiel")
 )
 
 // publish to s01.oss.sonatype.org (set to true to publish to oss.sonatype.org instead)
@@ -31,6 +32,8 @@ ThisBuild / githubWorkflowBuildPreamble ++= Seq(
 )
 ThisBuild / githubWorkflowEnv ++= Map(
   "PG_HOST_PORT" -> "localhost:5432",
+  "PG_HOST" -> "localhost",
+  "PG_PORT" -> "5432",
   "PG_USER" -> "postgres",
   "PG_DBNAME" -> "finagle_postgres_test",
   "PG_PASSWORD" -> "test"
@@ -59,6 +62,7 @@ lazy val root =
     `finagle-postgres`,
     `finagle-postgres-shapeless`,
     `finagle-postgres-quill`,
+    `finagle-postgres-skunk`,
     `weaver-twitter-future`,
     `weaver-twitter-future-core`
   )
@@ -106,7 +110,11 @@ lazy val `finagle-postgres-quill` = crossProject(JVMPlatform)
       "org.scalacheck" %% "scalacheck" % Versions.scalacheck % Test
     )
   )
-  .dependsOn(`finagle-postgres`, `weaver-twitter-future` % Test)
+  .dependsOn(
+    `finagle-postgres`,
+    `weaver-twitter-future` % Test,
+    `finagle-postgres-skunk` % Test
+  )
 
 lazy val `finagle-postgres-shapeless` = crossProject(JVMPlatform)
   .crossType(CrossType.Pure)

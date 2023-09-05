@@ -2,14 +2,7 @@ package finagle_postgres.skunk
 
 import cats.effect.IO
 import cats.effect.unsafe.{IORuntime, IORuntimeConfig, Scheduler}
-import com.twitter.util.{
-  Duration,
-  Future,
-  FuturePool,
-  JavaTimer,
-  Monitor,
-  Promise
-}
+import com.twitter.util.{Duration, Future, FuturePool, JavaTimer, Monitor, Promise, Return, Throw}
 
 import java.time.Instant
 import java.time.temporal.ChronoField
@@ -36,12 +29,13 @@ object Util {
   // From cats
   private val scheduler: Scheduler = new Scheduler {
     override def sleep(delay: FiniteDuration, task: Runnable): Runnable =
-      () => Future.Unit.flatMap { _ =>
-        implicit val timer: JavaTimer = new JavaTimer()
-        Future.sleep(Duration.fromMilliseconds(delay.toMillis)).flatMap { _ =>
-          Future { task.run() }
+      () =>
+        Future.Unit.flatMap { _ =>
+          implicit val timer: JavaTimer = new JavaTimer()
+          Future.sleep(Duration.fromMilliseconds(delay.toMillis)).flatMap { _ =>
+            Future { task.run() }
+          }
         }
-      }
 
     override def nowMillis(): Long = System.currentTimeMillis()
 
@@ -71,5 +65,14 @@ object Util {
     }(runtime)
 
     promise
+  }
+
+  def toIO[A](x: Future[A]): IO[A] = {
+    IO.async_[A] { cb =>
+      x.respond {
+        case Throw(e) => cb(Left(e))
+        case Return(r) => cb(Right(r))
+      }
+    }.evalOn(computeEC)
   }
 }
