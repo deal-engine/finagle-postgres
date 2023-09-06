@@ -9,7 +9,14 @@ import com.twitter.finagle.Status
 import com.twitter.finagle.context.Contexts
 import com.twitter.finagle.postgres.messages.SelectResult
 import com.twitter.finagle.postgres.values.ValueDecoder
-import com.twitter.finagle.postgres.{OK, Param, PostgresClient, QueryResponse, ResultSet, Row}
+import com.twitter.finagle.postgres.{
+  OK,
+  Param,
+  PostgresClient,
+  QueryResponse,
+  ResultSet,
+  Row
+}
 import com.twitter.io.StreamTermination.FullyRead
 import com.twitter.util.{Future, Return, Throw, Try}
 import skunk.*
@@ -32,12 +39,13 @@ class PostgresClientImpl(sessionPool: Resource[IO, Resource[IO, Session[IO]]])
 
   private var finalizerClosure: () => Future[Unit] = () => Future.Unit
 
-  private val sessionPoolResource: Future[Resource[IO, Session[IO]]] = Util.runIO(sessionPool.allocated).map {
-    case (res, fin) =>
+  private val sessionPoolResource: Future[Resource[IO, Session[IO]]] =
+    Util.runIO(sessionPool.allocated).map { case (res, fin) =>
       finalizerClosure = () => Util.runIO(fin)
       res
-  }
+    }
 
+  /*
   private def xuseSession[A](f: Session[IO] => Future[A]): Future[A] = {
 
     Contexts.local.get(PostgresClientImpl.sessionLocalKey) match {
@@ -51,7 +59,7 @@ class PostgresClientImpl(sessionPool: Resource[IO, Resource[IO, Session[IO]]])
           }
         }
     }
-  }
+  }*/
 
   private def useSessionIO[A](f: Session[IO] => IO[A]): Future[A] = {
     Contexts.local.get(PostgresClientImpl.sessionLocalKey) match {
@@ -60,22 +68,22 @@ class PostgresClientImpl(sessionPool: Resource[IO, Resource[IO, Session[IO]]])
       case None =>
         val s = sessionPoolResource.map(_.allocated).flatMap(Util.runIO)
         s.flatMap { case (current, finalizer) =>
-          Util.runIO(IO { f(current).flatMap { result =>
-            println("RUNNING FINALIZER")
-            finalizer.map(_ => result)
-          }}.flatten.onError(_ => finalizer)).map { r=>
-            println("HAZ FIN")
-            r
-          }
+          Util
+            .runIO(IO {
+              f(current).flatMap { result =>
+                finalizer.map(_ => result)
+              }
+            }.flatten.onError(_ => finalizer))
+            .map { r =>
+              r
+            }
         }
     }
   }
 
-
-  //private val sessionFuture: Future[Session[IO]] = alloc.map(_._1)
+  // private val sessionFuture: Future[Session[IO]] = alloc.map(_._1)
   // def as we dont want early execution
   private def finalizer(): Future[Unit] = finalizerClosure()
-
 
   override def charset: Charset = StandardCharsets.UTF_8
 
@@ -84,10 +92,10 @@ class PostgresClientImpl(sessionPool: Resource[IO, Resource[IO, Session[IO]]])
       useSessionIO { s =>
         s.transaction.use { _ =>
           Util.toIO {
-              fn(new PostgresClientImpl(sessionPool) {
-                override val isActive: AtomicBoolean = self.isActive
-                override val isTransaction: Boolean = true
-              })
+            fn(new PostgresClientImpl(sessionPool) {
+              override val isActive: AtomicBoolean = self.isActive
+              override val isTransaction: Boolean = true
+            })
           }
         }
       }
@@ -158,18 +166,21 @@ class PostgresClientImpl(sessionPool: Resource[IO, Resource[IO, Session[IO]]])
 
   override def query(sql: String): Future[QueryResponse] =
     useSessionIO { session =>
-        for {
-          xs <- session.execute(Query(
+      for {
+        xs <- session.execute(
+          Query(
             sql = sql,
             origin = Origin.unknown,
             encoder = skunk.Void.codec,
             decoder = decoder,
             isDynamic = true
-          ))
-        } yield ResultSet(AsyncStream.fromSeq(xs))
+          )
+        )
+      } yield ResultSet(AsyncStream.fromSeq(xs))
     }
 
-  override def fetch(sql: String): Future[SelectResult] = useSessionIO { session =>
+  override def fetch(sql: String): Future[SelectResult] = useSessionIO {
+    session =>
       val query: Query[Void, Row] = Query(
         sql = sql,
         origin = Origin.unknown,
@@ -180,22 +191,21 @@ class PostgresClientImpl(sessionPool: Resource[IO, Resource[IO, Session[IO]]])
       session.execute(query).map { _ =>
         SelectResult.Empty // TODO maybe
       }
-    }
+  }
 
   override def executeUpdate(sql: String): Future[OK] = execute(sql)
 
-  override def execute(sql: String): Future[OK] = useSessionIO  {
-    session =>
-      val command: Command[Void] =
-        Command(sql = sql, origin = Origin.unknown, encoder = skunk.Void.codec)
-      session.execute(command).map {
-        case Completion.Insert(count) => OK(count)
-        case Completion.Delete(count) => OK(count)
-        case Completion.Select(count) => OK(count)
-        case Completion.Update(count) => OK(count)
-        case Completion.Copy(count)   => OK(count)
-        case _                        => OK(0)
-      }
+  override def execute(sql: String): Future[OK] = useSessionIO { session =>
+    val command: Command[Void] =
+      Command(sql = sql, origin = Origin.unknown, encoder = skunk.Void.codec)
+    session.execute(command).map {
+      case Completion.Insert(count) => OK(count)
+      case Completion.Delete(count) => OK(count)
+      case Completion.Select(count) => OK(count)
+      case Completion.Update(count) => OK(count)
+      case Completion.Copy(count)   => OK(count)
+      case _                        => OK(0)
+    }
   }
 
   override def selectToStream[T](sql: String)(f: Row => T): AsyncStream[T] = {
@@ -206,10 +216,9 @@ class PostgresClientImpl(sessionPool: Resource[IO, Resource[IO, Session[IO]]])
       decoder = decoder,
       isDynamic = true
     )
-    println("Im hereeee")
     AsyncStream.fromFuture {
       useSessionIO { session =>
-          fs2IO2Async(session.stream[Void, Row](query)(skunk.Void, 6).map(f))
+        fs2IO2Async(session.stream[Void, Row](query)(skunk.Void, 6).map(f))
       }
     }.flatten
   }
@@ -248,7 +257,7 @@ class PostgresClientImpl(sessionPool: Resource[IO, Resource[IO, Session[IO]]])
   ): AsyncStream[T] = ???
 
   override def prepareAndQuery[T](sql: String, params: Param[_]*)(
-    f: Row => T
+      f: Row => T
   ): Future[Seq[T]] = useSessionIO { session =>
     val query: Query[Seq[Param[_]], Row] = Query(
       sql = sql,
@@ -264,7 +273,10 @@ class PostgresClientImpl(sessionPool: Resource[IO, Resource[IO, Session[IO]]])
     } yield r
   }
 
-  override def prepareAndExecute(sql: String, params: Param[_]*): Future[Int] = {
+  override def prepareAndExecute(
+      sql: String,
+      params: Param[_]*
+  ): Future[Int] = {
     useSessionIO { session =>
       val query: Command[Seq[Param[_]]] = Command(
         sql = sql,
@@ -281,7 +293,9 @@ class PostgresClientImpl(sessionPool: Resource[IO, Resource[IO, Session[IO]]])
           case Completion.Update(count) => IO.pure(count)
           case tt =>
             IO.raiseError(
-              new IllegalArgumentException(s"[$tt] shouldn't query in command code: $sql")
+              new IllegalArgumentException(
+                s"[$tt] shouldn't query in command code: $sql"
+              )
             )
         }
       } yield rr

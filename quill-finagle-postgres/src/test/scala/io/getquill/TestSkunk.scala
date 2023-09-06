@@ -1,10 +1,10 @@
 package io.getquill
 
-import scala.util.Try as ScalaTry
+import scala.util.{Try => ScalaTry}
 
 import cats.effect.{IO, Resource}
 import com.twitter.finagle.postgres.PostgresClient
-import com.twitter.util.{Await, Future, Try as TwitterTry, Throw}
+import com.twitter.util.{Await, Future, Try => TwitterTry, Throw}
 import weaver.*
 import skunk.*
 import natchez.Trace.Implicits.noop
@@ -42,26 +42,30 @@ object TestSkunk extends MutableTwitterFutureSuite {
   override type Res = FinaglePostgresContext[SnakeCase.type]
   override def sharedResource: Resource[IO, Res] =
     Resource.make {
-      IO.fromOption(UtilsSkunk.getClient)(new Exception("Failed to load env")).map { client =>
-        val ctx = new FinaglePostgresContext[SnakeCase.type](SnakeCase, client)
-        val a = {
-          import ctx.*
-          for {
-            _ <- ctx
-              .run(sql"DROP TABLE IF EXISTS table_test_skunk".as[Insert[Unit]])
-            _ <- ctx.run(
-              sql"CREATE TABLE table_test_skunk (id integer, name text)"
-                .as[Insert[Unit]]
-            )
-            _ <- ctx.run(
-              sql"INSERT INTO table_test_skunk (id, name) VALUES (1, null)"
-                .as[Insert[Unit]]
-            )
-          } yield ()
+      IO.fromOption(UtilsSkunk.getClient)(new Exception("Failed to load env"))
+        .map { client =>
+          val ctx =
+            new FinaglePostgresContext[SnakeCase.type](SnakeCase, client)
+          val a = {
+            import ctx.*
+            for {
+              _ <- ctx
+                .run(
+                  sql"DROP TABLE IF EXISTS table_test_skunk".as[Insert[Unit]]
+                )
+              _ <- ctx.run(
+                sql"CREATE TABLE table_test_skunk (id integer, name text)"
+                  .as[Insert[Unit]]
+              )
+              _ <- ctx.run(
+                sql"INSERT INTO table_test_skunk (id, name) VALUES (1, null)"
+                  .as[Insert[Unit]]
+              )
+            } yield ()
+          }
+          Await.result(a)
+          ctx
         }
-        Await.result(a)
-        ctx
-      }
     } { client =>
       IO.blocking(client.close()).void
     }
@@ -76,7 +80,7 @@ object TestSkunk extends MutableTwitterFutureSuite {
         result0 <- ctx.run(query[TableTestSkunk].filter(_.id == 0))
         result1 <- ctx.run(query[TableTestSkunk].filter(_.id == 1))
         result2 <- ctx.run(query[TableTestSkunk]).liftToTry
-        //_ = println(result2.throwable.getStackTrace.mkString("\n"))
+        // _ = println(result2.throwable.getStackTrace.mkString("\n"))
         _ = println(result2)
       } yield Seq(result0, result1)
     }
@@ -89,7 +93,8 @@ object TestSkunk extends MutableTwitterFutureSuite {
   trait SequentiallyComposableContainer[F[_]] extends cats.Monad[F]
 
   future("can have nested transactions") { ctx =>
-    case class ValuesInTransaction(v: Seq[TableTestSkunk]) extends Exception(s"UnU: $v")
+    case class ValuesInTransaction(v: Seq[TableTestSkunk])
+        extends Exception(s"UnU: $v")
     import ctx.*
     for {
       _ <- ctx.run(
@@ -116,7 +121,7 @@ object TestSkunk extends MutableTwitterFutureSuite {
       expect(values_down.isThrow)
       expect(values_down.throwable match {
         case ValuesInTransaction(v) => v.contains(TableTestSkunk(30, "30"))
-        case _ => false
+        case _                      => false
       })
       expect(values_top.length == 1)
       expect(values_top.contains(TableTestSkunk(10, "10")))

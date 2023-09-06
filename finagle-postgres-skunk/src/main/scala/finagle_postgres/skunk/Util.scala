@@ -2,7 +2,16 @@ package finagle_postgres.skunk
 
 import cats.effect.IO
 import cats.effect.unsafe.{IORuntime, IORuntimeConfig, Scheduler}
-import com.twitter.util.{Duration, Future, FuturePool, JavaTimer, Monitor, Promise, Return, Throw}
+import com.twitter.util.{
+  Duration,
+  Future,
+  FuturePool,
+  JavaTimer,
+  Monitor,
+  Promise,
+  Return,
+  Throw
+}
 
 import java.time.Instant
 import java.time.temporal.ChronoField
@@ -70,7 +79,7 @@ object Util {
   def toIO[A](x: Future[A]): IO[A] = {
     IO.async_[A] { cb =>
       x.respond {
-        case Throw(e) => cb(Left(e))
+        case Throw(e)  => cb(Left(e))
         case Return(r) => cb(Right(r))
       }
     }
