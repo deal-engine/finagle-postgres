@@ -110,7 +110,7 @@ class FinaglePostgresContext[N <: NamingStrategy](
   )(info: ExecutionInfo, dc: Runner): Future[Long] = {
     val (params, prepared) = prepare(Nil, ())
     logger.logQuery(sql, params)
-    if (!params.isEmpty) {
+    if (params.nonEmpty) {
       withClient(_.prepareAndExecute(sql, prepared: _*)).map(_.toLong)
     } else {
       withClient(_.execute(sql)).map(_ => 0)

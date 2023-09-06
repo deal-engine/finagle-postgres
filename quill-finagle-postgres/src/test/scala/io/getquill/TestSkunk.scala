@@ -1,13 +1,13 @@
 package io.getquill
 
+import scala.util.Try as ScalaTry
+
 import cats.effect.{IO, Resource}
 import com.twitter.finagle.postgres.PostgresClient
-import com.twitter.util.{Await, Future}
+import com.twitter.util.{Await, Future, Try as TwitterTry, Throw}
 import weaver.*
 import skunk.*
 import natchez.Trace.Implicits.noop
-
-import scala.util.Try
 
 object UtilsSkunk {
   def getClient: Option[PostgresClient] =
@@ -16,7 +16,7 @@ object UtilsSkunk {
       port = sys.env
         .get("PG_PORT")
         .flatMap { x =>
-          Try { x.toInt }.toOption
+          ScalaTry { x.toInt }.toOption
         }
         .getOrElse(5432)
       user <- sys.env.get("PG_USER")
@@ -24,12 +24,13 @@ object UtilsSkunk {
       dbname <- sys.env.get("PG_DBNAME")
     } yield {
       new finagle_postgres.skunk.PostgresClientImpl(
-        Session.single(
+        Session.pooled(
           host = host,
           port = port,
           user = user,
           database = dbname,
-          password = password
+          password = password,
+          max = 16
         )
       )
     }
@@ -74,7 +75,9 @@ object TestSkunk extends MutableTwitterFutureSuite {
         )
         result0 <- ctx.run(query[TableTestSkunk].filter(_.id == 0))
         result1 <- ctx.run(query[TableTestSkunk].filter(_.id == 1))
-        result2 <- ctx.run(query[TableTestSkunk])
+        result2 <- ctx.run(query[TableTestSkunk]).liftToTry
+        //_ = println(result2.throwable.getStackTrace.mkString("\n"))
+        _ = println(result2)
       } yield Seq(result0, result1)
     }
     results.map { case Seq(result0, result1) =>
@@ -83,7 +86,10 @@ object TestSkunk extends MutableTwitterFutureSuite {
     }
   }
 
+  trait SequentiallyComposableContainer[F[_]] extends cats.Monad[F]
+
   future("can have nested transactions") { ctx =>
+    case class ValuesInTransaction(v: Seq[TableTestSkunk]) extends Exception(s"UnU: $v")
     import ctx.*
     for {
       _ <- ctx.run(
@@ -99,15 +105,19 @@ object TestSkunk extends MutableTwitterFutureSuite {
               query[TableTestSkunk].insertValue(TableTestSkunk(30, "30"))
             )
           }
-         // _ <- Future.exception(new Exception("fnskjfhshjbsh"))
-          _ = throw new Exception("fnskjfhshjbsh2")
-          values_top <- ctx.run(query[TableTestSkunk])
-        } yield values_top
+          values_in_transaction <- ctx.run(query[TableTestSkunk])
+          _ <- Future.exception(ValuesInTransaction(values_in_transaction))
+        } yield values_in_transaction
       }.liftToTry
       values_top <- ctx.run(query[TableTestSkunk])
     } yield {
       println(s"VT: $values_top")
       println(s"VD: $values_down")
+      expect(values_down.isThrow)
+      expect(values_down.throwable match {
+        case ValuesInTransaction(v) => v.contains(TableTestSkunk(30, "30"))
+        case _ => false
+      })
       expect(values_top.length == 1)
       expect(values_top.contains(TableTestSkunk(10, "10")))
     }

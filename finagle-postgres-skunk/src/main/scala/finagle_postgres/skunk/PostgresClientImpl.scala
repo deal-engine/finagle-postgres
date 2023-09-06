@@ -2,21 +2,14 @@ package finagle_postgres.skunk
 
 import java.nio.charset.{Charset, StandardCharsets}
 import java.util.concurrent.atomic.AtomicBoolean
-
 import cats.data.State
 import cats.effect.{IO, Resource}
 import com.twitter.concurrent.AsyncStream
 import com.twitter.finagle.Status
+import com.twitter.finagle.context.Contexts
 import com.twitter.finagle.postgres.messages.SelectResult
 import com.twitter.finagle.postgres.values.ValueDecoder
-import com.twitter.finagle.postgres.{
-  OK,
-  Param,
-  PostgresClient,
-  QueryResponse,
-  ResultSet,
-  Row
-}
+import com.twitter.finagle.postgres.{OK, Param, PostgresClient, QueryResponse, ResultSet, Row}
 import com.twitter.util.{Future, Return, Throw, Try}
 import skunk.*
 import skunk.data.{Completion, Type}
@@ -24,18 +17,40 @@ import skunk.util.Origin
 
 /*
  * A Skunk client for communicating with Postgres.
+ * sessionPool must be pooled
  */
 
-class PostgresClientImpl(sessionR: Resource[IO, Session[IO]])
+object PostgresClientImpl {
+  private val sessionLocalKey = new Contexts.local.Key[Session[IO]]
+}
+
+class PostgresClientImpl(sessionPool: Resource[IO, Resource[IO, Session[IO]]])
     extends PostgresClient { self =>
   protected val isActive: AtomicBoolean = new AtomicBoolean(true)
   protected val isTransaction: Boolean = false
 
-  private val alloc: Future[(Session[IO], IO[Unit])] =
-    Util.runIO(sessionR.allocated)
-  private val sessionFuture = alloc.map(_._1)
+  private var allocInternal: Future[(Session[IO], IO[Unit])] = Future {
+    (null, IO.unit)
+  }
+
+  private val sessionPoolResource: Future[(Resource[IO, Session[IO]], IO[Unit])] = Util.runIO(sessionPool.allocated)
+
+  private def sessionFuture: Future[Session[IO]] = {
+    Contexts.local.get(PostgresClientImpl.sessionLocalKey) match {
+      case Some(value) => Future {
+        value
+      }
+      case None =>
+        val session = sessionPoolResource.map(_._1.allocated).flatMap(Util.runIO)
+        allocInternal = session
+        session.map(_._1)
+    }
+  }
+
+
+  //private val sessionFuture: Future[Session[IO]] = alloc.map(_._1)
   // def as we dont want early execution
-  private def finalizer(): Future[Unit] = alloc.flatMap { case (_, f) =>
+  private def finalizer(): Future[Unit] = allocInternal.flatMap { case (_, f) =>
     Util.runIO(f)
   }
   private val resourceUnreleased: Resource[IO, Session[IO]] =
@@ -50,18 +65,21 @@ class PostgresClientImpl(sessionR: Resource[IO, Session[IO]])
 
   override def inTransaction[T](fn: PostgresClient => Future[T]): Future[T] = {
     if (!isTransaction) {
-      sessionFuture.flatMap { session =>
-        Util
-          .runIO(session.transaction.use { ex =>
-            IO {
-              fn(new PostgresClientImpl(resourceUnreleased) {
-                override val isActive: AtomicBoolean = self.isActive
-                override val isTransaction: Boolean = true
-              })
+      Util.runIO(
+        for {
+          session <- Util.toIO(sessionFuture)
+          r <- session.transaction.use { ex =>
+            Util.toIO {
+              Contexts.local.let(PostgresClientImpl.sessionLocalKey, session) {
+                fn(new PostgresClientImpl(sessionPool) {
+                  override val isActive: AtomicBoolean = self.isActive
+                  override val isTransaction: Boolean = true
+                })
+              }
             }
-          })
-          .flatten
-      }
+          }
+        } yield r)
+
       // Allow nested transactions, probably a bad idea c:
       // Deal engine be like https://www.youtube.com/watch?v=5fbZTnZDvPA
     } else { fn(self) }
@@ -128,6 +146,21 @@ class PostgresClientImpl(sessionR: Resource[IO, Session[IO]])
   }
 
   override def query(sql: String): Future[QueryResponse] =
+    Util.runIO(
+      for {
+        session <- Util.toIO(sessionFuture)
+        query = Query(
+          sql = sql,
+          origin = Origin.unknown,
+          encoder = skunk.Void.codec,
+          decoder = decoder,
+          isDynamic = true
+        )
+        xs <- session.execute(query)
+      } yield ResultSet(AsyncStream.fromSeq(xs))
+    )
+
+  override def fetch(sql: String): Future[SelectResult] = {
     sessionFuture.flatMap { session =>
       val query: Query[Void, Row] = Query(
         sql = sql,
@@ -136,20 +169,10 @@ class PostgresClientImpl(sessionR: Resource[IO, Session[IO]])
         decoder = decoder,
         isDynamic = true
       )
-      Util.runIO(session.execute(query).map { xs =>
-        ResultSet(AsyncStream.fromSeq(xs))
+      Util.runIO(session.execute(query).map { _ =>
+        SelectResult.Empty // TODO maybe
       })
     }
-
-  override def fetch(sql: String): Future[SelectResult] = {
-    val query: Query[Void, Row] = Query(
-      sql = sql,
-      origin = Origin.unknown,
-      encoder = skunk.Void.codec,
-      decoder = decoder,
-      isDynamic = true
-    )
-    Future.exception(new NotImplementedError())
   }
 
   override def executeUpdate(sql: String): Future[OK] = execute(sql)
@@ -217,7 +240,11 @@ class PostgresClientImpl(sessionR: Resource[IO, Session[IO]])
 
   override def prepareAndQueryToStream[T](sql: String, params: Param[_]*)(
       f: Row => T
-  ): AsyncStream[T] = {
+  ): AsyncStream[T] = ???
+
+  override def prepareAndQuery[T](sql: String, params: Param[_]*)(
+    f: Row => T
+  ): Future[Seq[T]] = sessionFuture.flatMap { session =>
     val query: Query[Seq[Param[_]], Row] = Query(
       sql = sql,
       origin = Origin.unknown,
@@ -226,13 +253,10 @@ class PostgresClientImpl(sessionR: Resource[IO, Session[IO]])
       isDynamic = true
     )
 
-    AsyncStream.fromFuture {
-      Util.runIO(for {
-        session <- Util.toIO(sessionFuture)
-        pq <- session.prepare(query)
-        r <- fs2IO2Async(pq.stream(params, 6))
-      } yield r.map(f))
-    }.flatten
+    Util.runIO(for {
+      pq <- session.prepare(query)
+      r <- pq.stream(params, 6).map(f).compile.toList
+    } yield r)
   }
 
   override def prepareAndExecute(sql: String, params: Param[_]*): Future[Int] =
