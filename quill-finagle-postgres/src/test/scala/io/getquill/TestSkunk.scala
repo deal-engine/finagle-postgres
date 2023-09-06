@@ -30,7 +30,7 @@ object UtilsSkunk {
           user = user,
           database = dbname,
           password = password,
-          max = 16
+          max = 1
         )
       )
     }
@@ -42,7 +42,7 @@ object TestSkunk extends MutableTwitterFutureSuite {
   override type Res = FinaglePostgresContext[SnakeCase.type]
   override def sharedResource: Resource[IO, Res] =
     Resource.make {
-      IO.fromOption(UtilsSkunk.getClient)(new Exception()).map { client =>
+      IO.fromOption(UtilsSkunk.getClient)(new Exception("Failed to load env")).map { client =>
         val ctx = new FinaglePostgresContext[SnakeCase.type](SnakeCase, client)
         val a = {
           import ctx.*

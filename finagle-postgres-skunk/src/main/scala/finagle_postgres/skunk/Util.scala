@@ -62,7 +62,7 @@ object Util {
     io.unsafeRunAsync {
       case Left(e)  => promise.setException(e)
       case Right(a) => promise.setValue(a)
-    }(runtime)
+    }(cats.effect.unsafe.implicits.global)
 
     promise
   }
@@ -73,6 +73,6 @@ object Util {
         case Throw(e) => cb(Left(e))
         case Return(r) => cb(Right(r))
       }
-    }.evalOn(computeEC)
+    }
   }
 }

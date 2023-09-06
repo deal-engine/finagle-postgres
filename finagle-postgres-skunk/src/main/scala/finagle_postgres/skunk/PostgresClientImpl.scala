@@ -10,6 +10,7 @@ import com.twitter.finagle.context.Contexts
 import com.twitter.finagle.postgres.messages.SelectResult
 import com.twitter.finagle.postgres.values.ValueDecoder
 import com.twitter.finagle.postgres.{OK, Param, PostgresClient, QueryResponse, ResultSet, Row}
+import com.twitter.io.StreamTermination.FullyRead
 import com.twitter.util.{Future, Return, Throw, Try}
 import skunk.*
 import skunk.data.{Completion, Type}
@@ -29,57 +30,67 @@ class PostgresClientImpl(sessionPool: Resource[IO, Resource[IO, Session[IO]]])
   protected val isActive: AtomicBoolean = new AtomicBoolean(true)
   protected val isTransaction: Boolean = false
 
-  private var allocInternal: Future[(Session[IO], IO[Unit])] = Future {
-    (null, IO.unit)
+  private var finalizerClosure: () => Future[Unit] = () => Future.Unit
+
+  private val sessionPoolResource: Future[Resource[IO, Session[IO]]] = Util.runIO(sessionPool.allocated).map {
+    case (res, fin) =>
+      finalizerClosure = () => Util.runIO(fin)
+      res
   }
 
-  private val sessionPoolResource: Future[(Resource[IO, Session[IO]], IO[Unit])] = Util.runIO(sessionPool.allocated)
+  private def xuseSession[A](f: Session[IO] => Future[A]): Future[A] = {
 
-  private def sessionFuture: Future[Session[IO]] = {
     Contexts.local.get(PostgresClientImpl.sessionLocalKey) match {
-      case Some(value) => Future {
-        value
-      }
+      case Some(value) =>
+        f(value)
       case None =>
-        val session = sessionPoolResource.map(_._1.allocated).flatMap(Util.runIO)
-        allocInternal = session
-        session.map(_._1)
+        val s = sessionPoolResource.map(_.allocated).flatMap(Util.runIO)
+        s.flatMap { case (current, finalizer) =>
+          f(current).flatMap { result =>
+            Util.runIO(finalizer).map(_ => result)
+          }
+        }
+    }
+  }
+
+  private def useSessionIO[A](f: Session[IO] => IO[A]): Future[A] = {
+    Contexts.local.get(PostgresClientImpl.sessionLocalKey) match {
+      case Some(value) =>
+        Util.runIO(f(value))
+      case None =>
+        val s = sessionPoolResource.map(_.allocated).flatMap(Util.runIO)
+        s.flatMap { case (current, finalizer) =>
+          Util.runIO(IO { f(current).flatMap { result =>
+            println("RUNNING FINALIZER")
+            finalizer.map(_ => result)
+          }}.flatten.onError(_ => finalizer)).map { r=>
+            println("HAZ FIN")
+            r
+          }
+        }
     }
   }
 
 
   //private val sessionFuture: Future[Session[IO]] = alloc.map(_._1)
   // def as we dont want early execution
-  private def finalizer(): Future[Unit] = allocInternal.flatMap { case (_, f) =>
-    Util.runIO(f)
-  }
-  private val resourceUnreleased: Resource[IO, Session[IO]] =
-    Resource.make[IO, Session[IO]](IO.async_ { cb =>
-      sessionFuture.respond {
-        case Throw(e)  => cb(Left(e))
-        case Return(r) => cb(Right(r))
-      }
-    })(_ => IO.unit)
+  private def finalizer(): Future[Unit] = finalizerClosure()
+
 
   override def charset: Charset = StandardCharsets.UTF_8
 
   override def inTransaction[T](fn: PostgresClient => Future[T]): Future[T] = {
     if (!isTransaction) {
-      Util.runIO(
-        for {
-          session <- Util.toIO(sessionFuture)
-          r <- session.transaction.use { ex =>
-            Util.toIO {
-              Contexts.local.let(PostgresClientImpl.sessionLocalKey, session) {
-                fn(new PostgresClientImpl(sessionPool) {
-                  override val isActive: AtomicBoolean = self.isActive
-                  override val isTransaction: Boolean = true
-                })
-              }
-            }
+      useSessionIO { s =>
+        s.transaction.use { _ =>
+          Util.toIO {
+              fn(new PostgresClientImpl(sessionPool) {
+                override val isActive: AtomicBoolean = self.isActive
+                override val isTransaction: Boolean = true
+              })
           }
-        } yield r)
-
+        }
+      }
       // Allow nested transactions, probably a bad idea c:
       // Deal engine be like https://www.youtube.com/watch?v=5fbZTnZDvPA
     } else { fn(self) }
@@ -146,22 +157,19 @@ class PostgresClientImpl(sessionPool: Resource[IO, Resource[IO, Session[IO]]])
   }
 
   override def query(sql: String): Future[QueryResponse] =
-    Util.runIO(
-      for {
-        session <- Util.toIO(sessionFuture)
-        query = Query(
-          sql = sql,
-          origin = Origin.unknown,
-          encoder = skunk.Void.codec,
-          decoder = decoder,
-          isDynamic = true
-        )
-        xs <- session.execute(query)
-      } yield ResultSet(AsyncStream.fromSeq(xs))
-    )
+    useSessionIO { session =>
+        for {
+          xs <- session.execute(Query(
+            sql = sql,
+            origin = Origin.unknown,
+            encoder = skunk.Void.codec,
+            decoder = decoder,
+            isDynamic = true
+          ))
+        } yield ResultSet(AsyncStream.fromSeq(xs))
+    }
 
-  override def fetch(sql: String): Future[SelectResult] = {
-    sessionFuture.flatMap { session =>
+  override def fetch(sql: String): Future[SelectResult] = useSessionIO { session =>
       val query: Query[Void, Row] = Query(
         sql = sql,
         origin = Origin.unknown,
@@ -169,26 +177,25 @@ class PostgresClientImpl(sessionPool: Resource[IO, Resource[IO, Session[IO]]])
         decoder = decoder,
         isDynamic = true
       )
-      Util.runIO(session.execute(query).map { _ =>
+      session.execute(query).map { _ =>
         SelectResult.Empty // TODO maybe
-      })
+      }
     }
-  }
 
   override def executeUpdate(sql: String): Future[OK] = execute(sql)
 
-  override def execute(sql: String): Future[OK] = sessionFuture.flatMap {
+  override def execute(sql: String): Future[OK] = useSessionIO  {
     session =>
       val command: Command[Void] =
         Command(sql = sql, origin = Origin.unknown, encoder = skunk.Void.codec)
-      Util.runIO(session.execute(command).map {
+      session.execute(command).map {
         case Completion.Insert(count) => OK(count)
         case Completion.Delete(count) => OK(count)
         case Completion.Select(count) => OK(count)
         case Completion.Update(count) => OK(count)
         case Completion.Copy(count)   => OK(count)
         case _                        => OK(0)
-      })
+      }
   }
 
   override def selectToStream[T](sql: String)(f: Row => T): AsyncStream[T] = {
@@ -201,10 +208,8 @@ class PostgresClientImpl(sessionPool: Resource[IO, Resource[IO, Session[IO]]])
     )
     println("Im hereeee")
     AsyncStream.fromFuture {
-      sessionFuture.flatMap { session =>
-        Util.runIO(
+      useSessionIO { session =>
           fs2IO2Async(session.stream[Void, Row](query)(skunk.Void, 6).map(f))
-        )
       }
     }.flatten
   }
@@ -244,7 +249,7 @@ class PostgresClientImpl(sessionPool: Resource[IO, Resource[IO, Session[IO]]])
 
   override def prepareAndQuery[T](sql: String, params: Param[_]*)(
     f: Row => T
-  ): Future[Seq[T]] = sessionFuture.flatMap { session =>
+  ): Future[Seq[T]] = useSessionIO { session =>
     val query: Query[Seq[Param[_]], Row] = Query(
       sql = sql,
       origin = Origin.unknown,
@@ -253,21 +258,21 @@ class PostgresClientImpl(sessionPool: Resource[IO, Resource[IO, Session[IO]]])
       isDynamic = true
     )
 
-    Util.runIO(for {
+    for {
       pq <- session.prepare(query)
       r <- pq.stream(params, 6).map(f).compile.toList
-    } yield r)
+    } yield r
   }
 
-  override def prepareAndExecute(sql: String, params: Param[_]*): Future[Int] =
-    sessionFuture.flatMap { session =>
+  override def prepareAndExecute(sql: String, params: Param[_]*): Future[Int] = {
+    useSessionIO { session =>
       val query: Command[Seq[Param[_]]] = Command(
         sql = sql,
         origin = Origin.unknown,
         encoder = encoder
       )
 
-      Util.runIO(for {
+      for {
         pc <- session.prepare(query)
         r <- pc.execute(params)
         rr <- r match {
@@ -279,8 +284,9 @@ class PostgresClientImpl(sessionPool: Resource[IO, Resource[IO, Session[IO]]])
               new IllegalArgumentException(s"[$tt] shouldn't query in command code: $sql")
             )
         }
-      } yield rr)
+      } yield rr
     }
+  }
 
   /** Close the underlying connection pool and make this Client eternally down
     *
