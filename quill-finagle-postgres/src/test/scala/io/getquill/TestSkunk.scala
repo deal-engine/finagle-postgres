@@ -2,7 +2,7 @@ package io.getquill
 
 import cats.effect.{IO, Resource}
 import com.twitter.finagle.postgres.PostgresClient
-import com.twitter.util.Await
+import com.twitter.util.{Await, Future}
 import weaver.*
 import skunk.*
 import natchez.Trace.Implicits.noop
@@ -99,14 +99,17 @@ object TestSkunk extends MutableTwitterFutureSuite {
               query[TableTestSkunk].insertValue(TableTestSkunk(30, "30"))
             )
           }
+         // _ <- Future.exception(new Exception("fnskjfhshjbsh"))
+          _ = throw new Exception("fnskjfhshjbsh2")
           values_top <- ctx.run(query[TableTestSkunk])
         } yield values_top
-      }
+      }.liftToTry
       values_top <- ctx.run(query[TableTestSkunk])
     } yield {
       println(s"VT: $values_top")
       println(s"VD: $values_down")
-      expect(true)
+      expect(values_top.length == 1)
+      expect(values_top.contains(TableTestSkunk(10, "10")))
     }
   }
 }

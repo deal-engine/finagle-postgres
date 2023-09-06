@@ -52,7 +52,7 @@ class PostgresClientImpl(sessionR: Resource[IO, Session[IO]])
     if (!isTransaction) {
       sessionFuture.flatMap { session =>
         Util
-          .runIO(session.transaction.use { _ =>
+          .runIO(session.transaction.use { ex =>
             IO {
               fn(new PostgresClientImpl(resourceUnreleased) {
                 override val isActive: AtomicBoolean = self.isActive
