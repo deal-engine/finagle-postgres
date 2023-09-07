@@ -123,13 +123,13 @@ object TestSkunk extends MutableTwitterFutureSuite {
     } yield {
       println(s"VT: $values_top")
       println(s"VD: $values_down")
-      expect(values_down.isThrow)
-      expect(values_down.throwable match {
-        case ValuesInTransaction(v) => v.contains(TableTestSkunk(30, "30"))
-        case _                      => false
-      })
-      expect(values_top.length == 1)
-      expect(values_top.contains(TableTestSkunk(10, "10")))
+      expect(values_down.isThrow) &&
+        expect(values_down.throwable match {
+          case ValuesInTransaction(v) => v.contains(TableTestSkunk(30, "30"))
+          case _                      => false
+        }) &&
+        expect(values_top.length == 1) &&
+        expect(values_top == List(TableTestSkunk(10, "10")))
     }
   }
 }

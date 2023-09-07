@@ -67,13 +67,10 @@ class PostgresClientImpl(sessionPool: Resource[IO, Resource[IO, Session[IO]]], b
         Util.runIO(
           for {
             backpressure <- Util.toIO(() => sessionPoolResource.map(_.backpressure))
-            sessionResourceEffect <- Util.toIO(() => sessionPoolResource.map(_.pool.allocated))
-            sessionResourceOption <- sessionResourceEffect.metered(backpressure)
-            sessionResource <- IO.fromOption(sessionResourceOption)(new Exception("No more available spaces in pool."))
-            (session, sessionFinalizer) = sessionResource
-            r <- f(session).onError( _ => sessionFinalizer).onCancel(sessionFinalizer)
-            _ <- sessionFinalizer
-          } yield r
+            sessionPool <- Util.toIO(() => sessionPoolResource.map(_.pool))
+            maybeResult <- backpressure.metered { sessionPool.use(f) }
+            result <- IO.fromOption(maybeResult)(new Exception("No more available spaces in pool."))
+          } yield result
         )
     }
   }
