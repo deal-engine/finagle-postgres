@@ -75,6 +75,23 @@ class PostgresClientImpl(sessionPool: Resource[IO, Resource[IO, Session[IO]]], b
     }
   }
 
+  private def runTransaction[A](s: Session[IO])(fn: PostgresClient => Future[A]): IO[A] = {
+    for {
+      allocEffect <- s.transaction.allocated
+      (trans, transFinalizer) = allocEffect
+      result <- Util.toIO{ () =>
+        Contexts.local.let(PostgresClientImpl.sessionLocalKey, s) {
+          fn(new PostgresClientImpl(sessionPool, backpreassureConf) {
+            override val isActive: AtomicBoolean = self.isActive
+            override val isTransaction: Boolean = true
+          })
+        }
+      }.onError { _ => transFinalizer}
+      _ <- trans.commit
+      _ <- transFinalizer
+    } yield result
+  }
+
   // private val sessionFuture: Future[Session[IO]] = alloc.map(_._1)
   // def as we dont want early execution
   private def finalizer(): Future[Unit] = finalizerClosure()
@@ -84,14 +101,7 @@ class PostgresClientImpl(sessionPool: Resource[IO, Resource[IO, Session[IO]]], b
   override def inTransaction[T](fn: PostgresClient => Future[T]): Future[T] = {
     if (!isTransaction) {
       useSessionIO { s =>
-        s.transaction.use { _ =>
-          Util.toIO { () =>
-            fn(new PostgresClientImpl(sessionPool, backpreassureConf) {
-              override val isActive: AtomicBoolean = self.isActive
-              override val isTransaction: Boolean = true
-            })
-          }
-        }
+        runTransaction(s)(fn)
       }
       // Allow nested transactions, probably a bad idea c:
       // Deal engine be like https://www.youtube.com/watch?v=5fbZTnZDvPA
