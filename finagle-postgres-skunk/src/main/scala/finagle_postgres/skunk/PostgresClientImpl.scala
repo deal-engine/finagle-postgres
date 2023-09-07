@@ -3,20 +3,14 @@ package finagle_postgres.skunk
 import java.nio.charset.{Charset, StandardCharsets}
 import java.util.concurrent.atomic.AtomicBoolean
 import cats.data.State
+import cats.effect.std.Backpressure
 import cats.effect.{IO, Resource}
 import com.twitter.concurrent.AsyncStream
 import com.twitter.finagle.Status
 import com.twitter.finagle.context.Contexts
 import com.twitter.finagle.postgres.messages.SelectResult
 import com.twitter.finagle.postgres.values.ValueDecoder
-import com.twitter.finagle.postgres.{
-  OK,
-  Param,
-  PostgresClient,
-  QueryResponse,
-  ResultSet,
-  Row
-}
+import com.twitter.finagle.postgres.{OK, Param, PostgresClient, QueryResponse, ResultSet, Row}
 import com.twitter.io.StreamTermination.FullyRead
 import com.twitter.util.{Future, Return, Throw, Try}
 import skunk.*
@@ -32,18 +26,22 @@ object PostgresClientImpl {
   private val sessionLocalKey = new Contexts.local.Key[Session[IO]]
 }
 
-class PostgresClientImpl(sessionPool: Resource[IO, Resource[IO, Session[IO]]])
+class PostgresClientImpl(sessionPool: Resource[IO, Resource[IO, Session[IO]]], backpreassureConf: (Backpressure.Strategy, Int))
     extends PostgresClient { self =>
   protected val isActive: AtomicBoolean = new AtomicBoolean(true)
   protected val isTransaction: Boolean = false
 
   private var finalizerClosure: () => Future[Unit] = () => Future.Unit
 
-  private val sessionPoolResource: Future[Resource[IO, Session[IO]]] =
-    Util.runIO(sessionPool.allocated).map { case (res, fin) =>
-      finalizerClosure = () => Util.runIO(fin)
-      res
-    }
+  private final case class SessionPoolResource(pool: Resource[IO, Session[IO]], backpressure: Backpressure[IO])
+  private val sessionPoolResource: Future[SessionPoolResource] =
+    Util.runIO(
+      for {
+        sessionPool <- sessionPool.allocated
+        _ = finalizerClosure = () => Util.runIO(sessionPool._2)
+        backpressure <- Backpressure[IO](backpreassureConf._1, backpreassureConf._2)
+      } yield SessionPoolResource(sessionPool._1, backpressure)
+    )
 
   /*
   private def xuseSession[A](f: Session[IO] => Future[A]): Future[A] = {
@@ -66,18 +64,17 @@ class PostgresClientImpl(sessionPool: Resource[IO, Resource[IO, Session[IO]]])
       case Some(value) =>
         Util.runIO(f(value))
       case None =>
-        val s = sessionPoolResource.map(_.allocated).flatMap(Util.runIO)
-        s.flatMap { case (current, finalizer) =>
-          Util
-            .runIO(IO {
-              f(current).flatMap { result =>
-                finalizer.map(_ => result)
-              }
-            }.flatten.onError(_ => finalizer))
-            .map { r =>
-              r
-            }
-        }
+        Util.runIO(
+          for {
+            backpressure <- Util.toIO(() => sessionPoolResource.map(_.backpressure))
+            sessionResourceEffect <- Util.toIO(() => sessionPoolResource.map(_.pool.allocated))
+            sessionResourceOption <- sessionResourceEffect.metered(backpressure)
+            sessionResource <- IO.fromOption(sessionResourceOption)(new Exception("No more available spaces in pool."))
+            (session, sessionFinalizer) = sessionResource
+            r <- f(session).onError( _ => sessionFinalizer).onCancel(sessionFinalizer)
+            _ <- sessionFinalizer
+          } yield r
+        )
     }
   }
 
@@ -91,8 +88,8 @@ class PostgresClientImpl(sessionPool: Resource[IO, Resource[IO, Session[IO]]])
     if (!isTransaction) {
       useSessionIO { s =>
         s.transaction.use { _ =>
-          Util.toIO {
-            fn(new PostgresClientImpl(sessionPool) {
+          Util.toIO { () =>
+            fn(new PostgresClientImpl(sessionPool, backpreassureConf) {
               override val isActive: AtomicBoolean = self.isActive
               override val isTransaction: Boolean = true
             })

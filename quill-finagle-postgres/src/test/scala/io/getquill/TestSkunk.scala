@@ -1,10 +1,11 @@
 package io.getquill
 
-import scala.util.{Try => ScalaTry}
+import cats.effect.std.Backpressure
 
+import scala.util.Try as ScalaTry
 import cats.effect.{IO, Resource}
 import com.twitter.finagle.postgres.PostgresClient
-import com.twitter.util.{Await, Future, Try => TwitterTry, Throw}
+import com.twitter.util.{Await, Future, Throw, Try as TwitterTry}
 import weaver.*
 import skunk.*
 import natchez.Trace.Implicits.noop
@@ -31,6 +32,10 @@ object UtilsSkunk {
           database = dbname,
           password = password,
           max = 1
+        ),
+        (
+          Backpressure.Strategy.Lossless,
+          1
         )
       )
     }

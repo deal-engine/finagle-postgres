@@ -76,9 +76,9 @@ object Util {
     promise
   }
 
-  def toIO[A](x: Future[A]): IO[A] = {
+  def toIO[A](x: () => Future[A]): IO[A] = {
     IO.async_[A] { cb =>
-      x.respond {
+      x().respond {
         case Throw(e)  => cb(Left(e))
         case Return(r) => cb(Right(r))
       }
