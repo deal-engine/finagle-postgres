@@ -53,6 +53,8 @@ val Versions = {
     val scalamock = "5.2.0"
     val quill = "4.6.1"
     val weaver = "0.8.3"
+    val jasync = "2.2.4"
+    val effect = "3.5.1"
   }
   new Versions
 }
@@ -115,6 +117,22 @@ lazy val `finagle-postgres-quill` = crossProject(JVMPlatform)
     `weaver-twitter-future` % Test,
     `finagle-postgres-skunk` % Test
   )
+
+lazy val `quill-jasync-twitter` = crossProject(JVMPlatform)
+  .crossType(CrossType.Pure)
+  .in(file("quill-jasync-twitter"))
+  .settings(
+    name := "quill-jasync-twitter",
+    tlVersionIntroduced := Map("2.13" -> "0.14.1"),
+    libraryDependencies ++= Seq(
+      "com.twitter" %% "util-core" % Versions.twitter,
+      "io.getquill" %% "quill-sql" % Versions.quill,
+      "org.typelevel" %% "cats-effect" % Versions.effect,
+      "com.github.jasync-sql" % "jasync-postgresql" % Versions.jasync exclude("io.netty", "netty-handler"),
+      "io.netty" % "netty-handler" % "4.1.94.Final"
+    )
+  )
+  .dependsOn(`weaver-twitter-future` % Test)
 
 lazy val `finagle-postgres-shapeless` = crossProject(JVMPlatform)
   .crossType(CrossType.Pure)
