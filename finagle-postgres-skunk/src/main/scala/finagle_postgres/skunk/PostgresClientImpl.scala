@@ -10,7 +10,14 @@ import com.twitter.finagle.Status
 import com.twitter.finagle.context.Contexts
 import com.twitter.finagle.postgres.messages.SelectResult
 import com.twitter.finagle.postgres.values.ValueDecoder
-import com.twitter.finagle.postgres.{OK, Param, PostgresClient, QueryResponse, ResultSet, Row}
+import com.twitter.finagle.postgres.{
+  OK,
+  Param,
+  PostgresClient,
+  QueryResponse,
+  ResultSet,
+  Row
+}
 import com.twitter.io.StreamTermination.FullyRead
 import com.twitter.util.{Future, Return, Throw, Try}
 import skunk.*
@@ -26,20 +33,28 @@ object PostgresClientImpl {
   private val sessionLocalKey = new Contexts.local.Key[Session[IO]]
 }
 
-class PostgresClientImpl(sessionPool: Resource[IO, Resource[IO, Session[IO]]], backpreassureConf: (Backpressure.Strategy, Int))
-    extends PostgresClient { self =>
+class PostgresClientImpl(
+    sessionPool: Resource[IO, Resource[IO, Session[IO]]],
+    backpreassureConf: (Backpressure.Strategy, Int)
+) extends PostgresClient { self =>
   protected val isActive: AtomicBoolean = new AtomicBoolean(true)
   protected val isTransaction: Boolean = false
 
   private var finalizerClosure: () => Future[Unit] = () => Future.Unit
 
-  private final case class SessionPoolResource(pool: Resource[IO, Session[IO]], backpressure: Backpressure[IO])
+  private final case class SessionPoolResource(
+      pool: Resource[IO, Session[IO]],
+      backpressure: Backpressure[IO]
+  )
   private val sessionPoolResource: Future[SessionPoolResource] =
     Util.runIO(
       for {
         sessionPool <- sessionPool.allocated
         _ = finalizerClosure = () => Util.runIO(sessionPool._2)
-        backpressure <- Backpressure[IO](backpreassureConf._1, backpreassureConf._2)
+        backpressure <- Backpressure[IO](
+          backpreassureConf._1,
+          backpreassureConf._2
+        )
       } yield SessionPoolResource(sessionPool._1, backpressure)
     )
 
@@ -66,10 +81,14 @@ class PostgresClientImpl(sessionPool: Resource[IO, Resource[IO, Session[IO]]], b
       case None =>
         Util.runIO(
           for {
-            backpressure <- Util.toIO(() => sessionPoolResource.map(_.backpressure))
+            backpressure <- Util.toIO(() =>
+              sessionPoolResource.map(_.backpressure)
+            )
             sessionPool <- Util.toIO(() => sessionPoolResource.map(_.pool))
             maybeResult <- backpressure.metered { sessionPool.use(f) }
-            result <- IO.fromOption(maybeResult)(new Exception("No more available spaces in pool."))
+            result <- IO.fromOption(maybeResult)(
+              new Exception("No more available spaces in pool.")
+            )
           } yield result
         )
     }

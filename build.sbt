@@ -128,7 +128,7 @@ lazy val `quill-jasync-twitter` = crossProject(JVMPlatform)
       "com.twitter" %% "util-core" % Versions.twitter,
       "io.getquill" %% "quill-sql" % Versions.quill,
       "org.typelevel" %% "cats-effect" % Versions.effect,
-      "com.github.jasync-sql" % "jasync-postgresql" % Versions.jasync exclude("io.netty", "netty-handler"),
+      "com.github.jasync-sql" % "jasync-postgresql" % Versions.jasync exclude ("io.netty", "netty-handler"),
       "io.netty" % "netty-handler" % "4.1.94.Final"
     )
   )

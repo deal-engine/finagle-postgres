@@ -2,7 +2,17 @@ package finagle_postgres.skunk
 
 import cats.effect.IO
 import cats.effect.unsafe.{IORuntime, IORuntimeConfig, Scheduler}
-import com.twitter.util.{Duration, Future, FuturePool, JavaTimer, Monitor, Promise, Return, Throw, Try}
+import com.twitter.util.{
+  Duration,
+  Future,
+  FuturePool,
+  JavaTimer,
+  Monitor,
+  Promise,
+  Return,
+  Throw,
+  Try
+}
 
 import java.time.Instant
 import java.time.temporal.ChronoField
@@ -62,7 +72,7 @@ object Util {
     val promise: Promise[A] = Promise[A]()
 
     io.unsafeRunAsync {
-      case Left(e) => promise.setException(e)
+      case Left(e)  => promise.setException(e)
       case Right(a) => promise.setValue(a)
     }(cats.effect.unsafe.implicits.global)
 
@@ -74,21 +84,21 @@ object Util {
       Try {
         x()
       } match {
-        case Return(value) => value.respond {
-          case Throw(e) => cb(Left(e))
-          case Return(r) => cb(Right(r))
-        }
+        case Return(value) =>
+          value.respond {
+            case Throw(e)  => cb(Left(e))
+            case Return(r) => cb(Right(r))
+          }
         case Throw(err) => cb(Left(err))
       }
     }
   }
 
-
   def toIOEager[A](x: Future[A]): IO[A] = {
     IO.async_[A] { cb =>
       x
         .respond {
-          case Throw(e) => cb(Left(e))
+          case Throw(e)  => cb(Left(e))
           case Return(r) => cb(Right(r))
         }
     }
@@ -99,7 +109,7 @@ object Util {
       IO {
         val promise: scala.concurrent.Promise[A] = scala.concurrent.Promise[A]()
         x.respond {
-          case Return(value) => promise.success(value)
+          case Return(value)    => promise.success(value)
           case Throw(exception) => promise.failure(exception)
         }
         promise.future

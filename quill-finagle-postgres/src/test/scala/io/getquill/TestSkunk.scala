@@ -2,10 +2,10 @@ package io.getquill
 
 import cats.effect.std.Backpressure
 
-import scala.util.Try as ScalaTry
+import scala.util.{Try => ScalaTry}
 import cats.effect.{IO, Resource}
 import com.twitter.finagle.postgres.PostgresClient
-import com.twitter.util.{Await, Future, Throw, Try as TwitterTry}
+import com.twitter.util.{Await, Future, Throw, Try => TwitterTry}
 import weaver.*
 import skunk.*
 import natchez.Trace.Implicits.noop
@@ -124,13 +124,13 @@ object TestSkunk extends MutableTwitterFutureSuite {
       println(s"VT: $values_top")
       println(s"VD: $values_down")
       expect(values_down.isThrow) &&
-        expect(values_down.throwable match {
-          case ValuesInTransaction(v) => v.contains(TableTestSkunk(30, "30"))
-          case _                      => false
-        }) &&
-        expect(values_top.contains(TableTestSkunk(10, "10"))) &&
-        expect(!values_top.contains(TableTestSkunk(20, "30"))) &&
-        expect(!values_top.contains(TableTestSkunk(20, "30")))
+      expect(values_down.throwable match {
+        case ValuesInTransaction(v) => v.contains(TableTestSkunk(30, "30"))
+        case _                      => false
+      }) &&
+      expect(values_top.contains(TableTestSkunk(10, "10"))) &&
+      expect(!values_top.contains(TableTestSkunk(20, "30"))) &&
+      expect(!values_top.contains(TableTestSkunk(20, "30")))
     }
   }
 }
