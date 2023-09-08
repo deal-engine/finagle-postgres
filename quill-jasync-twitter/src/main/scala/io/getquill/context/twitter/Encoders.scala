@@ -79,7 +79,9 @@ trait Encoders {
     encoder[Array[Byte]](SqlTypes.VARBINARY)
   implicit val dateEncoder: Encoder[Date] = encoder[Date](
     (date: Date) => {
-      OffsetDateTime.ofInstant(date.toInstant, ZoneId.systemDefault()).toLocalDateTime
+      OffsetDateTime
+        .ofInstant(date.toInstant, ZoneId.systemDefault())
+        .toLocalDateTime
     },
     SqlTypes.DATE
   )

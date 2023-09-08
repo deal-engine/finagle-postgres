@@ -60,12 +60,19 @@ class TwitterPostgresContext[+N <: NamingStrategy](
       // Await.result(pool.sendQuery(sql), Duration.Inf) TODO
     }
 
-  private val twitterClient =
-    TwitterConnection.TwitterConnection(connection = pool)
+  private val twitterClientLocal: Local[TwitterConnection.TwitterConnection] =
+    new Local[TwitterConnection.TwitterConnection]
+
+  private val twitterClientPool =
+    TwitterConnection.TwitterConnectionPool(pool = pool)
 
   // Only create a client if none exists to allow nested transactions.
   def transaction[T](f: => Future[T]): Future[T] =
-    twitterClient.withTransaction(_ => f)
+    withClient {
+      _.inTransaction { txConn =>
+        twitterClientLocal.let(txConn) { f }
+      }
+    }
 
   def executeQuery[T](
       sql: String,
@@ -170,8 +177,13 @@ class TwitterPostgresContext[+N <: NamingStrategy](
 
   def withClient[A](
       function: TwitterConnection.TwitterConnection => Future[A]
-  ): Future[A] =
-    function(twitterClient)
+  ): Future[A] = twitterClientLocal() match {
+    case Some(conn) => function(conn)
+    case None =>
+      twitterClientPool.usingFreshConnectionFromPool { conn =>
+        twitterClientLocal.let(conn) { function(conn) }
+      }
+  }
 
   override private[getquill] def prepareParams(
       statement: String,

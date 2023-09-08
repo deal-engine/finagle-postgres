@@ -5,6 +5,7 @@ import cats.effect.kernel.Resource
 import com.github.jasync.sql.db.{Connection, QueryResult, RowData}
 import com.github.jasync.sql.db.pool.ConnectionPool
 import com.github.jasync.sql.db.postgresql.PostgreSQLConnection
+import com.twitter.concurrent.AsyncMutex
 import com.twitter.util.{Future, Local, Promise, Return, Throw}
 
 import java.util.concurrent.CompletableFuture
@@ -26,16 +27,18 @@ object TwitterConnection {
       fa.map(f)
   }
 
-  private val currentClient = new Local[TwitterConnection]
-
-  def completableFutureToTwitter[A](
+  implicit def completableFutureToTwitter[A](
       completableFuture: => CompletableFuture[A]
   ): Future[A] = {
     val promise: Promise[A] = Promise[A]()
     completableFuture.handleAsync(new function.BiFunction[A, Throwable, Unit] {
       override def apply(t: A, u: Throwable): Unit =
         if (u != null) {
-          promise.setException(u)
+          u match {
+            case e: java.util.concurrent.CompletionException =>
+              promise.setException(e.getCause)
+            case _ => promise.setException(u)
+          }
         } else {
           promise.setValue(t)
         }
@@ -43,7 +46,7 @@ object TwitterConnection {
     promise
   }
 
-  def twitterToCompletableFuture[A](
+  implicit def twitterToCompletableFuture[A](
       future: => Future[A]
   ): CompletableFuture[A] = {
     val completableFuture: CompletableFuture[A] = new CompletableFuture
@@ -54,28 +57,25 @@ object TwitterConnection {
     completableFuture
   }
 
-  case class TwitterConnection(connection: Connection) {
-    def withConnection[A](fn: TwitterConnection => Future[A]): Future[A] = {
-      currentClient() match {
-        case Some(value) => fn(value)
-        case None        => fn(TwitterConnection(connection))
-      }
-    }
+  case class TwitterConnectionPool(pool: ConnectionPool[PostgreSQLConnection]) {
+    self =>
+    def usingFreshConnectionFromPool[A](
+        fn: TwitterConnection => Future[A]
+    ): Future[A] =
+      (for {
+        _ <- Future.Unit
+        conn <- pool.take()
+        r <- fn(TwitterConnection(conn)).liftToTry
+        _ <- pool.giveBack(conn)
+      } yield r).lowerFromTry
+  }
 
-    def withTransaction[A](fn: TwitterConnection => Future[A]): Future[A] =
-      currentClient() match {
-        case Some(value) => fn(value) // We are in a transaction already
-        case None =>
-          completableFutureToTwitter {
-            connection.inTransaction({ newConnection =>
-              twitterToCompletableFuture {
-                currentClient.let(TwitterConnection(newConnection)) {
-                  withConnection(fn)
-                }
-              }
-            })
-          }
-      }
+  case class TwitterConnection(connection: Connection) {
+
+    def inTransaction[A](fn: TwitterConnection => Future[A]): Future[A] =
+      connection.inTransaction({ conn =>
+        fn(TwitterConnection(conn))
+      })
 
     def sendQuery(sql: String): Future[QueryResult] =
       completableFutureToTwitter(connection.sendQuery(sql))
