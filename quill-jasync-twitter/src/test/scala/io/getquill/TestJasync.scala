@@ -2,16 +2,19 @@ package io.getquill
 
 import cats.effect.std.Backpressure
 
-import scala.util.{Try => ScalaTry}
+import scala.util.Try as ScalaTry
 import cats.effect.{IO, Resource}
-import com.twitter.finagle.postgres.PostgresClient
-import com.twitter.util.{Await, Future, Throw, Try => TwitterTry}
+import com.github.jasync.sql.db.ConnectionPoolConfigurationBuilder
+import com.github.jasync.sql.db.pool.ConnectionPool
+import com.github.jasync.sql.db.postgresql.{PostgreSQLConnection, PostgreSQLConnectionBuilder}
+import com.twitter.util.{Await, Future, FuturePool, Throw, Try as TwitterTry}
+import io.getquill.context.twitter.TwitterPostgresContext
 import weaver.*
-import skunk.*
-import natchez.Trace.Implicits.noop
 
-object UtilsSkunk {
-  def getClient: Option[PostgresClient] =
+import java.util.concurrent.Executor
+
+object UtilsJasync {
+  def getClient: Option[ConnectionPool[PostgreSQLConnection]] =
     for {
       host <- sys.env.get("PG_HOST")
       port = sys.env
@@ -24,33 +27,34 @@ object UtilsSkunk {
       password = sys.env.get("PG_PASSWORD")
       dbname <- sys.env.get("PG_DBNAME")
     } yield {
-      new finagle_postgres.skunk.PostgresClientImpl(
-        Session.pooled(
-          host = host,
-          port = port,
-          user = user,
-          database = dbname,
-          password = password,
-          max = 1
-        ),
-        (
-          Backpressure.Strategy.Lossless,
-          1
-        )
-      )
+      val config: ConnectionPoolConfigurationBuilder = new ConnectionPoolConfigurationBuilder()
+      config.setHost(host)
+      config.setPort(port)
+      config.setUsername(user)
+      password.foreach(config.setPassword)
+      config.setDatabase(dbname)
+      config.setMaxActiveConnections(1)
+      config.setExecutionContext(new Executor {
+        override def execute(command: Runnable): Unit =
+          FuturePool.unboundedPool {
+            command.run()
+          }
+      })
+      println("sdksdmk")
+      PostgreSQLConnectionBuilder.createConnectionPool(config)
     }
 }
 
-object TestSkunk extends MutableTwitterFutureSuite {
+object TestJasync extends MutableTwitterFutureSuite {
   case class TableTestSkunk(id: Int, name: String)
 
-  override type Res = FinaglePostgresContext[SnakeCase.type]
+  override type Res = TwitterPostgresContext[SnakeCase.type]
   override def sharedResource: Resource[IO, Res] =
     Resource.make {
-      IO.fromOption(UtilsSkunk.getClient)(new Exception("Failed to load env"))
+      IO.fromOption(UtilsJasync.getClient)(new Exception("Failed to load env"))
         .map { client =>
           val ctx =
-            new FinaglePostgresContext[SnakeCase.type](SnakeCase, client)
+            new TwitterPostgresContext[SnakeCase.type](SnakeCase, client)
           val a = {
             import ctx.*
             for {

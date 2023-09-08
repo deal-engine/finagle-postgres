@@ -66,7 +66,8 @@ lazy val root =
     `finagle-postgres-quill`,
     `finagle-postgres-skunk`,
     `weaver-twitter-future`,
-    `weaver-twitter-future-core`
+    `weaver-twitter-future-core`,
+    `quill-jasync-twitter`
   )
 
 lazy val `finagle-postgres` = crossProject(JVMPlatform)
