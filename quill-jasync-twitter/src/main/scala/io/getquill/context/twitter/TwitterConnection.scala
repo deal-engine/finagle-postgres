@@ -65,27 +65,38 @@ object TwitterConnection {
       (for {
         _ <- Future.Unit
         conn <- pool.take()
-        r <- fn(TwitterConnection(conn)).liftToTry
+        r <- fn(TwitterConnection(InternalConnection(conn))).liftToTry
         _ <- pool.giveBack(conn)
       } yield r).lowerFromTry
   }
 
-  case class TwitterConnection(connection: Connection) {
+  case class InternalConnection(private val connection: Connection) {
+    private val mutex = new AsyncMutex()
+
+    private[TwitterConnection] def use[A](
+        fn: Connection => Future[A]
+    ): Future[A] =
+      mutex.acquireAndRun(fn(connection))
+  }
+
+  case class TwitterConnection(connection: InternalConnection) {
 
     def inTransaction[A](fn: TwitterConnection => Future[A]): Future[A] =
-      connection.inTransaction({ conn =>
-        fn(TwitterConnection(conn))
-      })
+      connection.use(_.inTransaction({ conn =>
+        fn(TwitterConnection(InternalConnection(conn)))
+      }))
 
     def sendQuery(sql: String): Future[QueryResult] =
-      completableFutureToTwitter(connection.sendQuery(sql))
+      connection.use(c => completableFutureToTwitter(c.sendQuery(sql)))
 
     def sendPreparedStatement(
         sql: String,
         params: Seq[Any]
     ): Future[QueryResult] =
-      completableFutureToTwitter(
-        connection.sendPreparedStatement(sql, params.asJava)
+      connection.use(c =>
+        completableFutureToTwitter(
+          c.sendPreparedStatement(sql, params.asJava)
+        )
       )
 
     def prepareAndQuery[T](sql: String, params: Seq[Any])(

@@ -138,4 +138,31 @@ object TestJasync extends MutableTwitterFutureSuite {
       expect(!values_top.contains(TableTestJasync(20, "30")))
     }
   }
+
+  future("parallel connections work") { ctx =>
+    import ctx.*
+    val first = ctx.run(
+      sql"""SELECT pg_sleep(10)""".as[Insert[Unit]]
+    )
+
+    val second = ctx.transaction {
+      val second_1 = ctx.run(
+        sql"""SELECT pg_sleep(10)""".as[Insert[Unit]]
+      )
+      val second_2 = ctx.run(
+        sql"""SELECT pg_sleep(10)""".as[Insert[Unit]]
+      )
+      for {
+        _ <- second_1
+        _ <- second_2
+      } yield ()
+    }
+
+    for {
+      _ <- first
+      _ <- second
+    } yield {
+      expect(true)
+    }
+  }
 }
