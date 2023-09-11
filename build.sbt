@@ -135,6 +135,23 @@ lazy val `quill-jasync-twitter` = crossProject(JVMPlatform)
   )
   .dependsOn(`weaver-twitter-future` % Test)
 
+lazy val `quill-jdbc-twitter` = crossProject(JVMPlatform)
+  .crossType(CrossType.Pure)
+  .in(file("quill-jdbc-twitter"))
+  .settings(
+    name := "quill-jdbc-twitter",
+    tlVersionIntroduced := Map("2.13" -> "0.14.1"),
+    libraryDependencies ++= Seq(
+      "com.twitter" %% "util-core" % Versions.twitter,
+      "io.getquill" %% "quill-sql" % Versions.quill,
+      "org.typelevel" %% "cats-effect" % Versions.effect,
+      "io.getquill" %% "quill-jdbc" % Versions.quill,
+      "io.catbird" %% "catbird-util" % "21.8.0",
+      "org.postgresql" % "postgresql" % "42.6.0"
+    )
+  )
+  .dependsOn(`weaver-twitter-future` % Test)
+
 lazy val `finagle-postgres-shapeless` = crossProject(JVMPlatform)
   .crossType(CrossType.Pure)
   .in(file("finagle-postgres-shapeless"))
