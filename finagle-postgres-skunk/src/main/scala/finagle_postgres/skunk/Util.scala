@@ -8,7 +8,10 @@ import com.twitter.util.{
   FuturePool,
   JavaTimer,
   Monitor,
-  Promise
+  Promise,
+  Return,
+  Throw,
+  Try
 }
 
 import java.time.Instant
@@ -36,12 +39,15 @@ object Util {
   // From cats
   private val scheduler: Scheduler = new Scheduler {
     override def sleep(delay: FiniteDuration, task: Runnable): Runnable =
-      () => Future.Unit.flatMap { _ =>
-        implicit val timer: JavaTimer = new JavaTimer()
-        Future.sleep(Duration.fromMilliseconds(delay.toMillis)).flatMap { _ =>
-          Future { task.run() }
+      () =>
+        Future.Unit.flatMap { _ =>
+          implicit val timer: JavaTimer = new JavaTimer()
+          Future.sleep(Duration.fromMilliseconds(delay.toMillis)).flatMap { _ =>
+            Future {
+              task.run()
+            }
+          }
         }
-      }
 
     override def nowMillis(): Long = System.currentTimeMillis()
 
@@ -68,8 +74,46 @@ object Util {
     io.unsafeRunAsync {
       case Left(e)  => promise.setException(e)
       case Right(a) => promise.setValue(a)
-    }(runtime)
+    }(cats.effect.unsafe.implicits.global)
 
     promise
+  }
+
+  def toIO[A](x: () => Future[A]): IO[A] = {
+    IO.async_[A] { cb =>
+      Try {
+        x()
+      } match {
+        case Return(value) =>
+          value.respond {
+            case Throw(e)  => cb(Left(e))
+            case Return(r) => cb(Right(r))
+          }
+        case Throw(err) => cb(Left(err))
+      }
+    }
+  }
+
+  def toIOEager[A](x: Future[A]): IO[A] = {
+    IO.async_[A] { cb =>
+      x
+        .respond {
+          case Throw(e)  => cb(Left(e))
+          case Return(r) => cb(Right(r))
+        }
+    }
+  }
+
+  def toIOEager2[A](x: Future[A]): IO[A] = {
+    IO.fromFuture {
+      IO {
+        val promise: scala.concurrent.Promise[A] = scala.concurrent.Promise[A]()
+        x.respond {
+          case Return(value)    => promise.success(value)
+          case Throw(exception) => promise.failure(exception)
+        }
+        promise.future
+      }
+    }
   }
 }

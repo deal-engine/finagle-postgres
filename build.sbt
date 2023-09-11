@@ -1,5 +1,5 @@
 // https://typelevel.org/sbt-typelevel/faq.html#what-is-a-base-version-anyway
-ThisBuild / tlBaseVersion := "0.16" // your current series x.y
+ThisBuild / tlBaseVersion := "0.17" // your current series x.y
 
 ThisBuild / organization := "io.github.deal-engine"
 ThisBuild / organizationName := "Deal Engine"
@@ -8,7 +8,8 @@ ThisBuild / licenses := Seq(License.Apache2)
 ThisBuild / developers := List(
   // your GitHub handle and name
   tlGitHubDev("ivanmoreau", "Iván Molina Rebolledo"),
-  tlGitHubDev("IvanAtDealEngine", "Iván Molina Rebolledo")
+  tlGitHubDev("IvanAtDealEngine", "Iván Molina Rebolledo"),
+  tlGitHubDev("fabianhjr-dealengine", "Fabián Heredia Montiel")
 )
 
 // publish to s01.oss.sonatype.org (set to true to publish to oss.sonatype.org instead)
@@ -31,6 +32,8 @@ ThisBuild / githubWorkflowBuildPreamble ++= Seq(
 )
 ThisBuild / githubWorkflowEnv ++= Map(
   "PG_HOST_PORT" -> "localhost:5432",
+  "PG_HOST" -> "localhost",
+  "PG_PORT" -> "5432",
   "PG_USER" -> "postgres",
   "PG_DBNAME" -> "finagle_postgres_test",
   "PG_PASSWORD" -> "test"
@@ -50,6 +53,8 @@ val Versions = {
     val scalamock = "5.2.0"
     val quill = "4.6.1"
     val weaver = "0.8.3"
+    val jasync = "2.2.4"
+    val effect = "3.5.1"
   }
   new Versions
 }
@@ -59,8 +64,11 @@ lazy val root =
     `finagle-postgres`,
     `finagle-postgres-shapeless`,
     `finagle-postgres-quill`,
+    `finagle-postgres-skunk`,
     `weaver-twitter-future`,
-    `weaver-twitter-future-core`
+    `weaver-twitter-future-core`,
+    `quill-jasync-twitter`,
+    `quill-jdbc-twitter`
   )
 
 lazy val `finagle-postgres` = crossProject(JVMPlatform)
@@ -106,7 +114,44 @@ lazy val `finagle-postgres-quill` = crossProject(JVMPlatform)
       "org.scalacheck" %% "scalacheck" % Versions.scalacheck % Test
     )
   )
-  .dependsOn(`finagle-postgres`, `weaver-twitter-future` % Test)
+  .dependsOn(
+    `finagle-postgres`,
+    `weaver-twitter-future` % Test,
+    `finagle-postgres-skunk` % Test
+  )
+
+lazy val `quill-jasync-twitter` = crossProject(JVMPlatform)
+  .crossType(CrossType.Pure)
+  .in(file("quill-jasync-twitter"))
+  .settings(
+    name := "quill-jasync-twitter",
+    tlVersionIntroduced := Map("2.13" -> "0.14.1"),
+    libraryDependencies ++= Seq(
+      "com.twitter" %% "util-core" % Versions.twitter,
+      "io.getquill" %% "quill-sql" % Versions.quill,
+      "org.typelevel" %% "cats-effect" % Versions.effect,
+      "com.github.jasync-sql" % "jasync-postgresql" % Versions.jasync exclude ("io.netty", "netty-handler"),
+      "io.netty" % "netty-handler" % "4.1.94.Final"
+    )
+  )
+  .dependsOn(`weaver-twitter-future` % Test)
+
+lazy val `quill-jdbc-twitter` = crossProject(JVMPlatform)
+  .crossType(CrossType.Pure)
+  .in(file("quill-jdbc-twitter"))
+  .settings(
+    name := "quill-jdbc-twitter",
+    tlVersionIntroduced := Map("2.13" -> "0.14.1"),
+    libraryDependencies ++= Seq(
+      "com.twitter" %% "util-core" % Versions.twitter,
+      "io.getquill" %% "quill-sql" % Versions.quill,
+      "org.typelevel" %% "cats-effect" % Versions.effect,
+      "io.getquill" %% "quill-jdbc" % Versions.quill,
+      "io.catbird" %% "catbird-util" % "21.8.0",
+      "org.postgresql" % "postgresql" % "42.6.0"
+    )
+  )
+  .dependsOn(`weaver-twitter-future` % Test)
 
 lazy val `finagle-postgres-shapeless` = crossProject(JVMPlatform)
   .crossType(CrossType.Pure)
