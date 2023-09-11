@@ -11,12 +11,16 @@ import com.github.jasync.sql.db.postgresql.{
   PostgreSQLConnectionBuilder
 }
 import com.twitter.util.{Await, Future, FuturePool, Throw, Try => TwitterTry}
+import com.typesafe.scalalogging.Logger
 import io.getquill.context.twitter.TwitterPostgresContext
 import weaver.*
 
 import java.util.concurrent.Executor
 
 object UtilsJasync {
+
+  val logT = Logger.apply("JasyncQuill")
+
   def getClient: Option[ConnectionPool[PostgreSQLConnection]] =
     for {
       host <- sys.env.get("PG_HOST")
@@ -58,7 +62,11 @@ object TestJasync extends MutableTwitterFutureSuite {
       IO.fromOption(UtilsJasync.getClient)(new Exception("Failed to load env"))
         .map { client =>
           val ctx =
-            new TwitterPostgresContext[SnakeCase.type](SnakeCase, client)
+            new TwitterPostgresContext[SnakeCase.type](
+              SnakeCase,
+              client,
+              UtilsJasync.logT.underlying
+            )
           val a = {
             import ctx.*
             for {

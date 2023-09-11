@@ -9,12 +9,14 @@ import io.getquill.{NamingStrategy, PostgresDialect, ReturnAction}
 import io.getquill.context.{Context, ContextVerbTranslate, ExecutionInfo}
 import io.getquill.context.sql.SqlContext
 import io.getquill.util.ContextLogger
+import org.slf4j.Logger
 
 import scala.util.Try
 
 class TwitterPostgresContext[+N <: NamingStrategy](
     val naming: N,
-    pool: ConnectionPool[PostgreSQLConnection]
+    pool: ConnectionPool[PostgreSQLConnection],
+    loggerslf4j: Logger
 ) extends Context[PostgresDialect, N]
     with ContextVerbTranslate
     with SqlContext[PostgresDialect, N]
@@ -64,7 +66,7 @@ class TwitterPostgresContext[+N <: NamingStrategy](
     new Local[TwitterConnection.TwitterConnection]
 
   private val twitterClientPool =
-    TwitterConnection.TwitterConnectionPool(pool = pool)
+    TwitterConnection.TwitterConnectionPool(pool = pool, loggerslf4j)
 
   // Only create a client if none exists to allow nested transactions.
   def transaction[T](f: => Future[T]): Future[T] =

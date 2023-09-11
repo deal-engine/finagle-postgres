@@ -5,10 +5,15 @@ import cats.effect.kernel.Resource
 import com.github.jasync.sql.db.{Connection, QueryResult, RowData}
 import com.github.jasync.sql.db.pool.ConnectionPool
 import com.github.jasync.sql.db.postgresql.PostgreSQLConnection
-import com.twitter.concurrent.AsyncMutex
+import com.twitter.concurrent.{AsyncMutex, Txs}
 import com.twitter.util.{Future, Local, Promise, Return, Throw}
+import org.slf4j.Logger
 
-import java.util.concurrent.CompletableFuture
+import java.util.concurrent.{
+  CompletableFuture,
+  CountDownLatch,
+  RejectedExecutionException
+}
 import java.util.function
 import java.util.function.BiConsumer
 import scala.jdk.CollectionConverters.*
@@ -57,7 +62,10 @@ object TwitterConnection {
     completableFuture
   }
 
-  case class TwitterConnectionPool(pool: ConnectionPool[PostgreSQLConnection]) {
+  case class TwitterConnectionPool(
+      pool: ConnectionPool[PostgreSQLConnection],
+      logger: Logger
+  ) {
     self =>
     def usingFreshConnectionFromPool[A](
         fn: TwitterConnection => Future[A]
@@ -65,29 +73,45 @@ object TwitterConnection {
       (for {
         _ <- Future.Unit
         conn <- pool.take()
-        r <- fn(TwitterConnection(InternalConnection(conn))).liftToTry
+        r <- fn(TwitterConnection(InternalConnection(conn))(logger)).liftToTry
         _ <- pool.giveBack(conn)
       } yield r).lowerFromTry
   }
 
+  final case class QuillConcurrentException(hint: String)
+      extends Exception(s"UNHANDLED RACE CONDITION. $hint")
+
   case class InternalConnection(private val connection: Connection) {
-    private val mutex = new AsyncMutex()
+    private val innerMutex = new AsyncMutex()
 
     private[TwitterConnection] def use[A](
         fn: Connection => Future[A]
-    ): Future[A] =
-      mutex.acquireAndRun(fn(connection))
+    )(
+        log: Logger
+    ): Future[A] = {
+      Future
+        .when(innerMutex.numPermitsAvailable <= 0) {
+          Future {
+            val error = QuillConcurrentException(hint =
+              "AREN'T YOU TRYING TO RUN PARALLEL TRANSACTIONS?"
+            )
+            log.warn("Trying to use mutex in transactional connection.", error)
+          }
+        }
+        .flatMap { _ =>
+          innerMutex.acquireAndRun(fn(connection))
+        }
+    }
   }
 
-  case class TwitterConnection(connection: InternalConnection) {
-
+  case class TwitterConnection(connection: InternalConnection)(logger: Logger) {
     def inTransaction[A](fn: TwitterConnection => Future[A]): Future[A] =
       connection.use(_.inTransaction({ conn =>
-        fn(TwitterConnection(InternalConnection(conn)))
-      }))
+        fn(TwitterConnection(InternalConnection(conn))(logger))
+      }))(logger)
 
     def sendQuery(sql: String): Future[QueryResult] =
-      connection.use(c => completableFutureToTwitter(c.sendQuery(sql)))
+      connection.use(c => completableFutureToTwitter(c.sendQuery(sql)))(logger)
 
     def sendPreparedStatement(
         sql: String,
@@ -97,7 +121,7 @@ object TwitterConnection {
         completableFutureToTwitter(
           c.sendPreparedStatement(sql, params.asJava)
         )
-      )
+      )(logger)
 
     def prepareAndQuery[T](sql: String, params: Seq[Any])(
         f: RowData => T
@@ -116,5 +140,4 @@ object TwitterConnection {
       sendQuery(sql).map(_.getRowsAffected)
     }
   }
-
 }
