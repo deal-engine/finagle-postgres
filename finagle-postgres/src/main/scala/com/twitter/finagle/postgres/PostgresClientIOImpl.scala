@@ -1,16 +1,21 @@
 package com.twitter.finagle.postgres
 
+import scala.concurrent.duration.{Duration => ScalaDuration}
 import cats.effect.IO
+import fs2.Stream
 import com.twitter.cache.Refresh
 import com.twitter.concurrent.AsyncStream
 import com.twitter.conversions.DurationOps.*
+import com.twitter.finagle.interop.CatsIO
 import com.twitter.finagle.postgres.messages.*
 import com.twitter.finagle.postgres.values.*
 import com.twitter.finagle.{Service, ServiceFactory, Status}
 import com.twitter.logging.Logger
+import com.twitter.util.Future
 import io.netty.buffer.ByteBuf
 
 import java.nio.charset.{Charset, StandardCharsets}
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import scala.language.{existentials, implicitConversions}
 import scala.util.Random
@@ -28,7 +33,7 @@ class PostgresClientIOImpl(
     ] forSome { type T }],
     binaryResults: Boolean = false,
     binaryParams: Boolean = false
-) extends PostgresClient {
+) extends PostgresClientIO {
   private[this] val counter = new AtomicInteger(0)
   private[this] val logger = Logger(getClass.getName)
   private val resultFormats = if (binaryResults) Seq(1) else Seq(0)
@@ -36,7 +41,7 @@ class PostgresClientIOImpl(
 
   val charset = StandardCharsets.UTF_8
 
-  private def retrieveTypeMap() = {
+  private def retrieveTypeMap(): IO[Map[Int, PostgresClient.TypeSpecifier]] = {
     // get a mapping of OIDs to the name of the receive function for all types in the remote DB.
     // typreceive is the most reliable way to determine how a type should be decoded
     val customTypesQuery =
@@ -50,7 +55,7 @@ class PostgresClientIOImpl(
       |WHERE          CAST(t.typreceive AS text) <> '-'
     """.stripMargin
 
-    val serviceF = factory.apply
+    val serviceF = CatsIO.fromTwitter(() => factory.apply)
 
     def extractTypes(
         response: PgResponse
@@ -64,38 +69,40 @@ class PostgresClientIOImpl(
             PostgresClient.defaultTypes,
             receiveFunctions
           ).rows
-          rowValues
-            .map { row =>
-              row.get[Int]("oid") -> PostgresClient.TypeSpecifier(
-                row.get[String]("typreceive"),
-                row.get[String]("type"),
-                row.get[Int]("typelem")
-              )
+          CatsIO
+            .fromTwitter { () =>
+              rowValues
+                .map { row =>
+                  row.get[Int]("oid") -> PostgresClient.TypeSpecifier(
+                    row.get[String]("typreceive"),
+                    row.get[String]("type"),
+                    row.get[Int]("typelem")
+                  )
+                }
+                .toSeq()
             }
-            .toSeq()
             .map(_.toMap)
       }
 
     val customTypesResult = for {
       service <- serviceF
-      response <- service.apply(PgRequest(Query(customTypesQuery)))
-      types <- extractTypes(response)
+      types <- (for {
+        response <- CatsIO.fromTwitter(() =>
+          service.apply(PgRequest(Query(customTypesQuery)))
+        )
+        types <- extractTypes(response)
+      } yield types).guarantee(IO { service.close() })
     } yield types
-
-    customTypesResult.ensure {
-      serviceF.foreach(_.close())
-    }
 
     customTypesResult
   }
 
-  private[postgres] val typeMap = Refresh.every(1.hour) {
-    types.map(IO(_)).getOrElse(retrieveTypeMap())
-  }
+  private[postgres] val typeMap: IO[Map[Int, PostgresClient.TypeSpecifier]] =
+    types.fold(retrieveTypeMap().memoize.flatten)(IO.pure)
 
   // The OIDs to be used when sending parameters
   private[postgres] val encodeOids =
-    typeMap().map { tm =>
+    typeMap.map { tm =>
       tm.toIndexedSeq
         .map { case (oid, PostgresClient.TypeSpecifier(_, typeName, _)) =>
           typeName -> oid
@@ -107,13 +114,13 @@ class PostgresClientIOImpl(
   /*
    * Execute some actions inside of a transaction using a single connection
    */
-  override def inTransaction[T](fn: PostgresClient => IO[T]): IO[T] =
+  override def inTransaction[T](fn: PostgresClientIO => IO[T]): IO[T] =
     for {
-      types <- typeMap()
-      service <- factory()
+      types <- typeMap
+      service <- CatsIO.fromTwitter(() => factory())
       constFactory = ServiceFactory.const(service)
       id = Random.alphanumeric.take(28).mkString
-      transactionalClient = new PostgresClientImpl(
+      transactionalClient = new PostgresClientIOImpl(
         constFactory,
         id,
         Some(types),
@@ -124,11 +131,15 @@ class PostgresClientIOImpl(
       closeTransaction = () =>
         transactionalClient
           .close()
-          .ensure(constFactory.close().ensure(service.close()))
+          .guarantee(
+            CatsIO.fromTwitter(() =>
+              constFactory.close().ensure(service.close())
+            )
+          )
       completeTransactionQuery = (sql: String) =>
-        transactionalClient.query(sql).ensure(closeTransaction())
-      _ <- transactionalClient.query("BEGIN").onFailure(_ => closeTransaction())
-      result <- fn(transactionalClient).rescue { case err =>
+        transactionalClient.query(sql).guarantee(closeTransaction())
+      _ <- transactionalClient.query("BEGIN").onError(_ => closeTransaction())
+      result <- fn(transactionalClient).handleErrorWith { case err =>
         for {
           _ <- completeTransactionQuery("ROLLBACK")
           _ <- IO.raiseError(err)
@@ -142,7 +153,7 @@ class PostgresClientIOImpl(
    */
   override def query(sql: String): IO[QueryResponse] = sendQuery(sql) {
     case SelectResult(fields, rows) =>
-      typeMap().map { types =>
+      typeMap.map { types =>
         ResultSet(fields, charset, rows, types, receiveFunctions)
       }
     case CommandCompleteResponse(affected) => IO(OK(affected))
@@ -167,30 +178,35 @@ class PostgresClientIOImpl(
   /*
    * Run a single SELECT query and wrap the results with the provided function.
    */
-  override def selectToStream[T](sql: String)(f: Row => T): AsyncStream[T] =
-    AsyncStream.fromFuture {
+  override def selectToStream[T](sql: String)(f: Row => T): Stream[IO, T] = {
+    Stream.eval {
       for {
-        types <- typeMap()
+        types <- typeMap
         SelectResult(fields, rows) <- fetch(sql)
-      } yield ResultSet(fields, charset, rows, types, receiveFunctions).rows
+      } yield CatsIO
+        .fromTwitter(
+          ResultSet(fields, charset, rows, types, receiveFunctions).rows
+        )
         .map(f)
     }.flatten
+  }
 
   /*
    * Issue a single, prepared SELECT query and wrap the response rows with the provided function.
    */
   override def prepareAndQueryToStream[T](sql: String, params: Param[_]*)(
       f: Row => T
-  ): AsyncStream[T] =
-    AsyncStream.fromFuture {
-      typeMap().flatMap { _ =>
+  ): Stream[IO, T] = {
+    Stream
+      .eval(typeMap.flatMap { _ =>
         for {
-          service <- factory()
+          service <- CatsIO.fromTwitter(() => factory())
           statement = new PreparedStatementImpl(sql, service)
           result <- statement.selectToStream(params: _*)(f)
         } yield result
-      }
-    }.flatten
+      })
+      .flatten
+  }
 
   /*
    * Issue a single, prepared arbitrary query without an expected result set, and provide the affected row count
@@ -199,9 +215,9 @@ class PostgresClientIOImpl(
       sql: String,
       params: Param[_]*
   ): IO[Int] = {
-    typeMap().flatMap { _ =>
+    typeMap.flatMap { _ =>
       for {
-        service <- factory()
+        service <- CatsIO.fromTwitter(() => factory())
         statement = new PreparedStatementImpl(sql, service)
         OK(count) <- statement.exec(params: _*)
       } yield count
@@ -212,7 +228,7 @@ class PostgresClientIOImpl(
     * @return
     */
   override def close(): IO[Unit] = {
-    factory.close()
+    CatsIO.fromTwitter(() => factory.close())
   }
 
   /** The current availability [[Status]] of this client.
@@ -237,17 +253,19 @@ class PostgresClientIOImpl(
       handler: PartialFunction[PgResponse, IO[T]]
   ) = {
     val service = optionalService.getOrElse(factory.toService)
-    service(r).flatMap(handler orElse { case unexpected =>
-      IO.raiseError(
-        new IllegalStateException(s"Unexpected response $unexpected")
-      )
-    })
+    CatsIO
+      .fromTwitter(() => service(r))
+      .flatMap(handler orElse { case unexpected =>
+        IO.raiseError(
+          new IllegalStateException(s"Unexpected response $unexpected")
+        )
+      })
   }
 
   private[this] class PreparedStatementImpl(
       sql: String,
       service: Service[PgRequest, PgResponse]
-  ) extends PreparedStatement {
+  ) extends PreparedStatementIO {
 
     private[this] val name = s"fin-pg-$id-" + counter.incrementAndGet
 
@@ -315,7 +333,7 @@ class PostgresClientIOImpl(
       }
 
       val f = for {
-        types <- typeMap()
+        types <- typeMap
         pname <- parse(params: _*)
         _ <- bind(paramBuffers)
         fields <- describe()
@@ -325,23 +343,13 @@ class PostgresClientIOImpl(
         case Rows(rows) =>
           ResultSet(fields, charset, rows, types, receiveFunctions)
       }
-      f.transform { result =>
-        sync(Some(service)).flatMap { _ =>
-          Future.const(result)
+      f.attempt
+        .flatMap { result =>
+          sync(Some(service)).flatMap { _ =>
+            IO.fromEither(result)
+          }
         }
-      }.ensure(service.close())
+        .guarantee(CatsIO.fromTwitter(() => service.close()))
     }
   }
-}
-
-case class Param[T](value: T)(implicit val encoder: ValueEncoder[T]) {
-  def encodeText(charset: Charset = StandardCharsets.UTF_8) =
-    ValueEncoder.encodeText(value, encoder, charset)
-  def encodeBinary(charset: Charset = StandardCharsets.UTF_8) =
-    ValueEncoder.encodeBinary(value, encoder, charset)
-}
-
-object Param {
-  implicit def convert[T](t: T)(implicit encoder: ValueEncoder[T]): Param[T] =
-    Param(t)
 }

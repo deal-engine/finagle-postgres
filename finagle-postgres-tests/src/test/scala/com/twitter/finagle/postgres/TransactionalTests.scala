@@ -51,15 +51,15 @@ object TransactionalTests extends MutableTwitterFutureSuite {
   future("parallel connections work") { ctx =>
     import ctx.*
     val first = ctx.run(
-      sql"""SELECT 1 FROM (SELECT pg_sleep(2)) AS subquery""".as[Query[Int]]
+      sql"""SELECT 1 FROM (SELECT pg_sleep(4)) AS subquery""".as[Query[Int]]
     )
 
     val second = ctx.transaction {
       val second_1 = ctx.run(
-        sql"""SELECT 1 FROM (SELECT pg_sleep(2)) AS subquery""".as[Query[Int]]
+        sql"""SELECT 1 FROM (SELECT pg_sleep(4)) AS subquery""".as[Query[Int]]
       )
       val second_2 = ctx.run(
-        sql"""SELECT 1 FROM (SELECT pg_sleep(2)) AS subquery""".as[Query[Int]]
+        sql"""SELECT 1 FROM (SELECT pg_sleep(4)) AS subquery""".as[Query[Int]]
       )
       for {
         _ <- second_1
