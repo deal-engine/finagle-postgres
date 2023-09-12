@@ -35,6 +35,15 @@ class PostgresClientImpl(
   private val resultFormats = if (binaryResults) Seq(1) else Seq(0)
   private val paramFormats = if (binaryParams) Seq(1) else Seq(0)
 
+  def liftFuture: PostgresClientIOImpl = new PostgresClientIOImpl(
+    factory,
+    id,
+    types,
+    receiveFunctions,
+    binaryResults,
+    binaryParams
+  )
+
   val charset = StandardCharsets.UTF_8
 
   private def retrieveTypeMap() = {

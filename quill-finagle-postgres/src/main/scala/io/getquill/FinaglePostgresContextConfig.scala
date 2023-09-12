@@ -2,8 +2,8 @@ package io.getquill
 
 import com.twitter.finagle.Postgres
 import com.twitter.finagle.Postgres.{Client, CustomTypes}
-import com.twitter.finagle.postgres.PostgresClient
-import com.twitter.finagle.postgres.values._
+import com.twitter.finagle.postgres.{PostgresClient, PostgresClientIOImpl, PostgresClientImpl}
+import com.twitter.finagle.postgres.values.*
 import com.twitter.finagle.service.RetryPolicy
 import com.typesafe.config.Config
 
@@ -46,6 +46,6 @@ case class FinaglePostgresContextConfig(config: Config) {
   private def clientWithSSL: Client =
     if (useSsl) clientCustomTypes.withTransport.tls else clientCustomTypes
 
-  def client: PostgresClient = clientWithSSL
+  def client: (PostgresClientImpl, PostgresClientIOImpl) = clientWithSSL
     .newRichClient(host)
 }
