@@ -50,6 +50,8 @@ val Versions = {
     val scalamock = "5.2.0"
     val quill = "4.6.1"
     val weaver = "0.8.3"
+    val effects = "3.5.1"
+    val fs2 = "3.9.1"
   }
   new Versions
 }
@@ -74,6 +76,8 @@ lazy val `finagle-postgres` = crossProject(JVMPlatform)
     libraryDependencies ++= Seq(
       "com.twitter" %% "finagle-core" % Versions.twitter,
       "com.twitter" %% "finagle-netty4" % Versions.twitter,
+      "org.typelevel" %% "cats-effect" % Versions.effects,
+      "co.fs2" %% "fs2-core" % Versions.fs2,
       "org.scalatest" %% "scalatest" % Versions.scalaTest % Test,
       "org.scalatestplus" %% "scalacheck-1-17" % Versions.scalaTestCheck % Test,
       "org.scalacheck" %% "scalacheck" % Versions.scalacheck % Test,
