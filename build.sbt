@@ -82,6 +82,18 @@ lazy val `finagle-postgres` = crossProject(JVMPlatform)
     )
   )
 
+lazy val `finagle-postgres-tests` = crossProject(JVMPlatform)
+  .crossType(CrossType.Pure)
+  .in(file("finagle-postgres-tests"))
+  .settings(
+    name := "finagle-postgres-tests"
+  )
+  .dependsOn(
+    `finagle-postgres`,
+    `finagle-postgres-quill`,
+    `weaver-twitter-future` % Test
+  )
+
 lazy val `finagle-postgres-skunk` = crossProject(JVMPlatform)
   .crossType(CrossType.Pure)
   .in(file("finagle-postgres-skunk"))
