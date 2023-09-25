@@ -23,7 +23,7 @@ trait FinaglePostgresDecoders {
       vd: ValueDecoder[T],
       withRescue: Throwable => T = (e: Throwable) =>
         e match {
-          case (e: IllegalStateException) if e.getMessage == "Value is NULL" =>
+          case (_: com.twitter.finagle.postgres.codec.NullValue.type) =>
             null.asInstanceOf[T]
           case _ => fail(e.getMessage)
         }
