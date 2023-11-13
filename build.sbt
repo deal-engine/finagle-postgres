@@ -44,7 +44,7 @@ ThisBuild / scalaVersion := Scala213 // the default Scala
 val Versions = {
   class Versions {
     val twitter = "23.11.0"
-    val circeTesting = "0.14.5"
+    val circeTesting = "0.14.6"
     val scalaTest = "3.2.17"
     val scalaTestCheck = "3.2.17.0"
     val scalacheck = "1.17.0"
