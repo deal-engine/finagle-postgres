@@ -45,8 +45,8 @@ val Versions = {
   class Versions {
     val twitter = "23.11.0"
     val circeTesting = "0.14.5"
-    val scalaTest = "3.2.16"
-    val scalaTestCheck = "3.2.16.0"
+    val scalaTest = "3.2.17"
+    val scalaTestCheck = "3.2.17.0"
     val scalacheck = "1.17.0"
     val scalamock = "5.2.0"
     val quill = "4.8.0"
