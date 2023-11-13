@@ -43,7 +43,7 @@ ThisBuild / scalaVersion := Scala213 // the default Scala
 
 val Versions = {
   class Versions {
-    val twitter = "22.12.0"
+    val twitter = "23.11.0"
     val circeTesting = "0.14.5"
     val scalaTest = "3.2.16"
     val scalaTestCheck = "3.2.16.0"
@@ -138,7 +138,7 @@ lazy val `weaver-twitter-future-core` = crossProject(JVMPlatform)
       "com.twitter" %% "util-core" % Versions.twitter,
       "com.disneystreaming" %% "weaver-core" % Versions.weaver,
       "com.disneystreaming" %% "weaver-cats" % Versions.weaver,
-      "org.typelevel" %% "catbird-util" % Versions.twitter
+      "org.typelevel" %% "catbird-util" % "22.12.0" // TODO: Update
     )
   )
 
@@ -153,7 +153,7 @@ lazy val `weaver-twitter-future` = crossProject(JVMPlatform)
     libraryDependencies ++= Seq(
       "com.disneystreaming" %% "weaver-framework" % Versions.weaver,
       "com.twitter" %% "util-core" % Versions.twitter,
-      "org.typelevel" %% "catbird-util" % Versions.twitter
+      "org.typelevel" %% "catbird-util" % "22.12.0" // TODO: Update
     )
   )
   .dependsOn(`weaver-twitter-future-core`)
