@@ -49,7 +49,7 @@ val Versions = {
     val scalaTestCheck = "3.2.16.0"
     val scalacheck = "1.17.0"
     val scalamock = "5.2.0"
-    val quill = "4.6.1"
+    val quill = "4.8.0"
     val weaver = "0.8.3"
   }
   new Versions
