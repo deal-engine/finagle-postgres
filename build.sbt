@@ -21,7 +21,10 @@ ThisBuild / tlSitePublishBranch := Some("master")
 ThisBuild / tlFatalWarnings := false
 ThisBuild / tlCiHeaderCheck := false
 
-ThisBuild / githubWorkflowJavaVersions := Seq(JavaSpec.temurin("11"), JavaSpec.temurin("17"))
+ThisBuild / githubWorkflowJavaVersions := Seq(
+  JavaSpec.temurin("11"),
+  JavaSpec.temurin("17")
+)
 ThisBuild / githubWorkflowBuildPreamble ++= Seq(
   WorkflowStep.Run(
     commands = List("docker-compose up -d"),
