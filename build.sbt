@@ -1,5 +1,5 @@
 // https://typelevel.org/sbt-typelevel/faq.html#what-is-a-base-version-anyway
-ThisBuild / tlBaseVersion := "0.17" // your current series x.y
+ThisBuild / tlBaseVersion := "0.18" // your current series x.y
 
 ThisBuild / organization := "io.github.deal-engine"
 ThisBuild / organizationName := "Deal Engine"
@@ -20,6 +20,11 @@ ThisBuild / tlSitePublishBranch := Some("master")
 
 ThisBuild / tlFatalWarnings := false
 ThisBuild / tlCiHeaderCheck := false
+
+ThisBuild / githubWorkflowJavaVersions := Seq(
+  JavaSpec.temurin("11"),
+  JavaSpec.temurin("17")
+)
 ThisBuild / githubWorkflowBuildPreamble ++= Seq(
   WorkflowStep.Run(
     commands = List("docker-compose up -d"),
@@ -43,13 +48,13 @@ ThisBuild / scalaVersion := Scala213 // the default Scala
 
 val Versions = {
   class Versions {
-    val twitter = "22.12.0"
-    val circeTesting = "0.14.5"
-    val scalaTest = "3.2.16"
-    val scalaTestCheck = "3.2.16.0"
+    val twitter = "23.11.0"
+    val circeTesting = "0.14.6"
+    val scalaTest = "3.2.17"
+    val scalaTestCheck = "3.2.17.0"
     val scalacheck = "1.17.0"
     val scalamock = "5.2.0"
-    val quill = "4.6.1"
+    val quill = "4.8.0"
     val weaver = "0.8.3"
   }
   new Versions
@@ -138,7 +143,7 @@ lazy val `weaver-twitter-future-core` = crossProject(JVMPlatform)
       "com.twitter" %% "util-core" % Versions.twitter,
       "com.disneystreaming" %% "weaver-core" % Versions.weaver,
       "com.disneystreaming" %% "weaver-cats" % Versions.weaver,
-      "org.typelevel" %% "catbird-util" % Versions.twitter
+      "org.typelevel" %% "catbird-util" % "22.12.0" // TODO: Update
     )
   )
 
@@ -153,7 +158,7 @@ lazy val `weaver-twitter-future` = crossProject(JVMPlatform)
     libraryDependencies ++= Seq(
       "com.disneystreaming" %% "weaver-framework" % Versions.weaver,
       "com.twitter" %% "util-core" % Versions.twitter,
-      "org.typelevel" %% "catbird-util" % Versions.twitter
+      "org.typelevel" %% "catbird-util" % "22.12.0" // TODO: Update
     )
   )
   .dependsOn(`weaver-twitter-future-core`)
