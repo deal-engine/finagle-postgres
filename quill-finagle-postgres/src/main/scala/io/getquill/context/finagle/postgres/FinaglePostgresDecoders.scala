@@ -3,17 +3,16 @@ package io.getquill.context.finagle.postgres
 import java.nio.charset.Charset
 import java.time.{LocalDate, LocalDateTime, ZoneId}
 import java.util.{Date, UUID}
-
 import com.twitter.finagle.postgres.values.ValueDecoder
 import com.twitter.util.Return
 import com.twitter.util.Throw
 import com.twitter.util.Try
-import io.getquill.FinaglePostgresContext
+import io.getquill.{FinagleCtxBase, FinaglePostgresContext}
 import io.getquill.util.Messages.fail
 import io.netty.buffer.ByteBuf
 
 trait FinaglePostgresDecoders {
-  this: FinaglePostgresContext[_] =>
+  this: FinagleCtxBase[_] =>
 
   import ValueDecoder._
 

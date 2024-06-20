@@ -138,7 +138,7 @@ object Postgres {
     type Out = PgResponse
     type Context = TransportContext
 
-    def newRichClient(): postgres.PostgresClientImpl = {
+    def newRichClient(): (postgres.PostgresClientImpl, postgres.PostgresClientIOImpl) = {
 
       val Dest(name) = params[Dest]
       val CustomTypes(customTypes) = params[CustomTypes]
@@ -150,19 +150,26 @@ object Postgres {
 
       val client = newClient(name, id)
 
-      new postgres.PostgresClientImpl(
+      (new postgres.PostgresClientImpl(
         client,
         id,
         customTypes,
         customReceiveFunctions,
         binaryResults,
         binaryParams
-      )
+      ), new postgres.PostgresClientIOImpl(
+        client,
+        id,
+        customTypes,
+        customReceiveFunctions,
+        binaryResults,
+        binaryParams
+      ))
     }
 
-    def newRichClient(addr: String): postgres.PostgresClientImpl =
+    def newRichClient(addr: String): (postgres.PostgresClientImpl, postgres.PostgresClientIOImpl) =
       dest(addr).newRichClient()
-    def newRichClient(addr: Name): postgres.PostgresClientImpl =
+    def newRichClient(addr: Name): (postgres.PostgresClientImpl, postgres.PostgresClientIOImpl) =
       dest(addr).newRichClient()
 
     def dest(

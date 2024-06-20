@@ -13,8 +13,10 @@ import io.getquill.context.{Context, ContextVerbTranslate, ExecutionInfo}
 
 class FinaglePostgresContext[N <: NamingStrategy](
     val naming: N,
-    client: PostgresClient
-) extends Context[FinaglePostgresDialect, N]
+    client: PostgresClientImpl,
+    val currentClient: Local[PostgresClientImpl] = new Local[PostgresClientImpl]
+) extends FinagleCtxBase[N]
+    with Context[FinaglePostgresDialect, N]
     with ContextVerbTranslate
     with SqlContext[FinaglePostgresDialect, N]
     with FinaglePostgresEncoders
@@ -23,7 +25,7 @@ class FinaglePostgresContext[N <: NamingStrategy](
   import FinaglePostgresContext._
 
   def this(naming: N, config: FinaglePostgresContextConfig) =
-    this(naming, config.client)
+    this(naming, config.client._1)
   def this(naming: N, config: Config) =
     this(naming, FinaglePostgresContextConfig(config))
   def this(naming: N, configPrefix: String) =
@@ -56,8 +58,6 @@ class FinaglePostgresContext[N <: NamingStrategy](
 
   implicit val nullChecker: NullChecker = new FinaglePgNullChecker()
 
-  private val currentClient = new Local[PostgresClient]
-
   override def close = Await.result(client.close())
 
   private def expandAction(sql: String, returningAction: ReturnAction): String =
@@ -76,7 +76,7 @@ class FinaglePostgresContext[N <: NamingStrategy](
   def transaction[T](f: => Future[T]) = currentClient() match {
     case None =>
       client.inTransaction { c =>
-        currentClient.let(c) { f }
+        currentClient.let(c.asInstanceOf) { f }
       }
     case Some(c) =>
       f
